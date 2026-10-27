@@ -14,7 +14,9 @@ A Bloomberg-style market terminal that runs locally on one PC. Every data source
 - Work is tracked as GitHub issues (private repo `jitishp04/FinTerminal`). One branch and one PR per issue (`feat/<issue#>-short-name`), and the PR body says `Closes #<n>`.
 
 ## Stack
-Next.js (App Router) + TypeScript + Tailwind · TanStack Query · TradingView `lightweight-charts` · Vitest.
+Next.js 16 (App Router, `cacheComponents` on) + TypeScript + Tailwind v4 · TanStack Query · TradingView `lightweight-charts` · Vitest.
+
+@AGENTS.md
 
 ```
 src/app/page.tsx                 terminal shell: command bar, 4-panel grid, status bar
@@ -39,4 +41,4 @@ src/components/functions/*.tsx   one component per function code
 ## Commands
 - `npm run dev`: start at http://localhost:3000
 - `npm test`: Vitest
-- `npm run build` / `npm run lint` / `npx tsc --noEmit`
+- `npm run build` / `npm run lint` / `npm run typecheck` (runs `next typegen` first: route types like `LayoutProps` are generated)

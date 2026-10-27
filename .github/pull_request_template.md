@@ -4,5 +4,5 @@ Closes #
 
 ## How it was verified
 - [ ] `npm test`
-- [ ] `npm run build` and `npx tsc --noEmit`
+- [ ] `npm run lint`, `npm run typecheck`, `npm run build`
 - [ ] Checked in the browser (commands tried):

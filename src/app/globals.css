@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* Terminal palette: dark only, by design. */
+:root {
+  --background: #000000;
+  --panel: #0a0a0a;
+  --border: #2a2a2a;
+  --foreground: #e6e6e6;
+  --muted: #8c8c8c;
+  --amber: #ffa028;
+  --up: #2fd16b;
+  --down: #ff4d4d;
+  --link: #5fb4ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-amber: var(--amber);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-link: var(--link);
+  --font-mono: var(--font-terminal);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-terminal), ui-monospace, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

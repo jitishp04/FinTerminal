@@ -1,0 +1,42 @@
+# FinTerminal
+
+A Bloomberg-style market terminal that runs locally on one PC. Every data source must be free: the only paid tool is the Claude subscription.
+
+## Hard rules
+- **Free data only.** Never add a paid API, a paid tier, or a source that needs a credit card. Free-key tiers (FRED, Finnhub) are fine.
+- **Local only.** The app runs at localhost for personal use. It is never deployed. (Yahoo Finance is unofficial and limited to personal use.)
+- **Secrets stay in `.env.local`** (gitignored). Read keys only in server code (`src/app/api/**`, `src/lib/providers/**`). Never expose them to the client bundle, and never commit them.
+- **No in-app LLM calls.** The Claude subscription does not cover API usage.
+
+## How we work
+- Follow the `karpathy-guidelines` skill on every code change: think before coding, keep it simple, make surgical changes, define verifiable goals.
+- Use the agent-skills workflow: `/agent-skills:plan` → `/agent-skills:build` → `/agent-skills:test` → `/agent-skills:review`. Build in thin vertical slices: each slice is tested, checked in the browser, and committed.
+- Work is tracked as GitHub issues (private repo `jitishp04/FinTerminal`). One branch and one PR per issue (`feat/<issue#>-short-name`), and the PR body says `Closes #<n>`.
+
+## Stack
+Next.js (App Router) + TypeScript + Tailwind · TanStack Query · TradingView `lightweight-charts` · Vitest.
+
+```
+src/app/page.tsx                 terminal shell: command bar, 4-panel grid, status bar
+src/app/api/*/route.ts           server routes; the only place that calls data providers
+src/lib/providers/*.ts           one adapter per source → normalized types in src/lib/types.ts
+src/lib/cache.ts                 in-memory TTL cache + in-flight dedupe
+src/lib/commands.ts              parses "AAPL GP" → { symbol, fn, args }
+src/components/functions/*.tsx   one component per function code
+```
+
+## Data sources
+| Data | Source | Key |
+|---|---|---|
+| Quotes, charts, profile, movers (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
+| Quote fallback (US stocks) | Finnhub | `FINNHUB_API_KEY` |
+| Financial statements, filings, insider Form 4s | SEC EDGAR (≤10 req/s) | `SEC_USER_AGENT` (required contact header) |
+| Macro series, Treasury yield curve | FRED | `FRED_API_KEY` |
+
+## Function codes
+`<SYM> GP` chart · `<SYM> DES` description · `<SYM> FA` financials · `<SYM> CF` filings · `<SYM> INS` insiders · `W` watchlist · `WEI` world indices · `SECT` sectors · `MOST` movers · `FX` currencies · `CMDTY` commodities · `ECO [FRED_ID]` macro · `CURV` yield curve · `HELP`
+
+## Commands
+- `npm run dev`: start at http://localhost:3000
+- `npm test`: Vitest
+- `npm run build` / `npm run lint` / `npx tsc --noEmit`

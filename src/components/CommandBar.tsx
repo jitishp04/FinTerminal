@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { parseCommand, type Command } from "@/lib/commands";
 
-export function CommandBar({ onRun }: { onRun: (command: Command) => void }) {
+export function CommandBar({ panel, onRun }: { panel: number; onRun: (command: Command) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,10 +60,13 @@ export function CommandBar({ onRun }: { onRun: (command: Command) => void }) {
 
   return (
     <div className="flex items-center gap-2 border-b border-border px-3 py-1">
-      <span className="text-amber">&gt;</span>
+      <span className="text-amber" title={`Runs in panel ${panel + 1}`}>
+        {panel + 1}&gt;
+      </span>
       <input
         ref={inputRef}
-        aria-label="Command"
+        data-command-bar
+        aria-label={`Command for panel ${panel + 1}`}
         value={value}
         onChange={(e) => {
           setValue(e.target.value);

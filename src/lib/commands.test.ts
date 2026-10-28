@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommand } from "./commands";
+import { formatCommand, parseCommand } from "./commands";
 
 function ok(input: string) {
   const result = parseCommand(input);
@@ -66,5 +66,11 @@ describe("parseCommand", () => {
   it("rejects malformed symbols and arguments", () => {
     expect(error("AAPL$ GP")).toMatch(/invalid symbol/i);
     expect(error("ECO UN-RATE")).toMatch(/invalid argument/i);
+  });
+});
+
+describe("formatCommand", () => {
+  it.each(["AAPL GP", "WEI", "ECO UNRATE", "W GP", "EURUSD=X GP"])("round-trips %s", (input) => {
+    expect(formatCommand(ok(input))).toBe(input);
   });
 });

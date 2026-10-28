@@ -1,18 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 import type { Command } from "@/lib/commands";
+import { PANEL_COUNT, parseLayout, serializeLayout, type Layout } from "@/lib/layout";
+import { getLayoutSnapshot, getServerLayoutSnapshot, saveLayout, subscribeLayout } from "@/lib/layoutStore";
 import { CommandBar } from "./CommandBar";
 import { FunctionView } from "./FunctionView";
+import { Panel } from "./Panel";
 
 export function Terminal() {
-  const [command, setCommand] = useState<Command>({ fn: "HELP", args: [] });
+  const raw = useSyncExternalStore(subscribeLayout, getLayoutSnapshot, getServerLayoutSnapshot);
+  const layout = useMemo(() => parseLayout(raw), [raw]);
+  const [maximized, setMaximized] = useState<number | null>(null);
+
+  const save = (next: Layout) => saveLayout(serializeLayout(next));
+
+  function run(command: Command) {
+    save({ ...layout, panels: layout.panels.map((p, i) => (i === layout.focused ? command : p)) });
+  }
+
+  function focus(index: number) {
+    if (index !== layout.focused) save({ ...layout, focused: index });
+    // While a panel is maximized, moving focus shows the newly focused panel instead.
+    if (maximized !== null) setMaximized(index);
+  }
+
+  // Tab / Shift+Tab cycle the focused panel, except inside other form fields.
+  const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
+    if ((e.target as HTMLElement).closest("input:not([data-command-bar]), textarea, select, [contenteditable]")) return;
+    e.preventDefault();
+    focus((layout.focused + (e.shiftKey ? PANEL_COUNT - 1 : 1)) % PANEL_COUNT);
+  });
+  useEffect(() => {
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <>
-      <CommandBar onRun={setCommand} />
-      <main className="flex-1 overflow-auto p-3">
-        <FunctionView command={command} />
+      <CommandBar panel={layout.focused} onRun={run} />
+      <main
+        className={`grid min-h-0 flex-1 gap-px bg-border ${maximized === null ? "grid-cols-2 grid-rows-2" : "grid-cols-1 grid-rows-1"}`}
+      >
+        {layout.panels.map((command, i) => (
+          <Panel
+            key={i}
+            index={i}
+            command={command}
+            focused={i === layout.focused}
+            maximized={maximized === i}
+            hidden={maximized !== null && maximized !== i}
+            onFocus={() => focus(i)}
+            onToggleMaximize={() => setMaximized(maximized === i ? null : i)}
+          >
+            <FunctionView command={command} />
+          </Panel>
+        ))}
       </main>
     </>
   );

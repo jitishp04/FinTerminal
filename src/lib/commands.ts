@@ -32,6 +32,11 @@ export function parseCommand(input: string): ParseResult {
   return fail(`Unknown function: ${tokens[1] ?? tokens[0]}. Type HELP.`);
 }
 
+/** Inverse of parseCommand: `{ fn: "GP", symbol: "AAPL" }` → `"AAPL GP"`. */
+export function formatCommand(command: Command): string {
+  return [command.symbol, command.fn, ...command.args].filter(Boolean).join(" ");
+}
+
 function build(def: FunctionDef, symbol: string | undefined, args: string[]): ParseResult {
   if (symbol !== undefined && !SYMBOL.test(symbol)) return fail(`Invalid symbol: ${symbol}`);
   if (args.length > 0 && !def.arg) return fail(`${def.code} takes no arguments`);

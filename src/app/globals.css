@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Terminal palette: dark only, by design. */
+/* Terminal palette: dark only, by design. Violet is for chart overlays. */
 :root {
   --background: #000000;
   --panel: #0a0a0a;
@@ -11,6 +11,7 @@
   --up: #2fd16b;
   --down: #ff4d4d;
   --link: #5fb4ff;
+  --violet: #c38cff;
 }
 
 @theme inline {
@@ -23,6 +24,7 @@
   --color-up: var(--up);
   --color-down: var(--down);
   --color-link: var(--link);
+  --color-violet: var(--violet);
   --font-mono: var(--font-terminal);
 }
 

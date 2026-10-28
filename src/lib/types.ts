@@ -42,6 +42,8 @@ export interface Chart {
   currency?: string;
   /** The exchange's IANA time zone, for axis labels. */
   timeZone: string;
+  /** Where the range starts. Earlier bars are history, so 200-bar averages cover the whole range. */
+  from: number;
   bars: Bar[];
 }
 

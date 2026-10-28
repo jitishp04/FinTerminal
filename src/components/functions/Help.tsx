@@ -30,6 +30,12 @@ export function Help({ onOpen }: { onOpen: (command: Command) => void }) {
           </ul>
         </section>
       ))}
+      <p className="text-xs text-muted">
+        Prices from Yahoo Finance. Charts: TradingView Lightweight Charts™, Copyright (c) 2025 TradingView, Inc.{" "}
+        <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer" className="text-link hover:underline">
+          tradingview.com
+        </a>
+      </p>
     </div>
   );
 }

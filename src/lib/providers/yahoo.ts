@@ -17,19 +17,30 @@ const QUOTE_TTL = 10 * SECOND;
 const PROFILE_TTL = 60 * MINUTE;
 
 const daysAgo = (days: number) => (now: Date) => new Date(now.getTime() - days * DAY);
+const startOfYear = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
 
-/** How each range is fetched. `sessions` trims intraday bars to the last N trading days. */
+// Calendar days holding 200 trading days, or 200 weeks: history fetched before a range so SMA 200 covers it.
+const DAILY_HISTORY = 300;
+const WEEKLY_HISTORY = 1410;
+
+/**
+ * How each range is fetched: `days` of bars back from today, history included.
+ * Intraday ranges start at the last N trading sessions in the data, the others at `start`.
+ */
 const RANGES: Record<
   ChartRange,
-  { interval: "5m" | "15m" | "1d" | "1wk"; start: (now: Date) => Date; sessions?: number; ttl: number }
+  { interval: "5m" | "15m" | "1d" | "1wk"; days: number; ttl: number } & (
+    | { sessions: number }
+    | { start: (now: Date) => Date }
+  )
 > = {
-  "1D": { interval: "5m", start: daysAgo(7), sessions: 1, ttl: MINUTE },
-  "5D": { interval: "15m", start: daysAgo(12), sessions: 5, ttl: MINUTE },
-  "1M": { interval: "1d", start: daysAgo(31), ttl: 10 * MINUTE },
-  "6M": { interval: "1d", start: daysAgo(183), ttl: 10 * MINUTE },
-  YTD: { interval: "1d", start: (now) => new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), ttl: 10 * MINUTE },
-  "1Y": { interval: "1d", start: daysAgo(366), ttl: 10 * MINUTE },
-  "5Y": { interval: "1wk", start: daysAgo(5 * 365 + 2), ttl: 10 * MINUTE },
+  "1D": { interval: "5m", days: 7, sessions: 1, ttl: MINUTE },
+  "5D": { interval: "15m", days: 30, sessions: 5, ttl: MINUTE },
+  "1M": { interval: "1d", days: 31 + DAILY_HISTORY, start: daysAgo(31), ttl: 10 * MINUTE },
+  "6M": { interval: "1d", days: 183 + DAILY_HISTORY, start: daysAgo(183), ttl: 10 * MINUTE },
+  YTD: { interval: "1d", days: 366 + DAILY_HISTORY, start: startOfYear, ttl: 10 * MINUTE },
+  "1Y": { interval: "1d", days: 366 + DAILY_HISTORY, start: daysAgo(366), ttl: 10 * MINUTE },
+  "5Y": { interval: "1wk", days: 1827 + WEEKLY_HISTORY, start: daysAgo(1827), ttl: 10 * MINUTE },
 };
 
 /** Latest quotes in one Yahoo request. Unknown symbols are left out. */
@@ -40,23 +51,19 @@ export function quote(symbols: string[]): Promise<Quote[]> {
   );
 }
 
-/** Price bars for `range`, with the bar size the range calls for. */
+/** Price bars for `range`, with the bar size the range calls for, plus history before it. */
 export function chart(symbol: string, range: ChartRange): Promise<Chart> {
-  const { interval, start, sessions, ttl } = RANGES[range];
-  return cached(`chart:${symbol}:${range}`, ttl, () =>
+  const spec = RANGES[range];
+  const { interval } = spec;
+  return cached(`chart:${symbol}:${range}`, spec.ttl, () =>
     orNotFound(symbol, async () => {
+      const now = new Date();
       // The library defaults to adding pre- and post-market bars; charts show the regular session.
-      const { meta, quotes } = await yahoo.chart(symbol, { period1: start(new Date()), interval, includePrePost: false });
+      const { meta, quotes } = await yahoo.chart(symbol, { period1: daysAgo(spec.days)(now), interval, includePrePost: false });
       const timeZone = meta.exchangeTimezoneName;
       const bars = toBars(quotes);
-      return {
-        symbol: meta.symbol,
-        range,
-        interval,
-        currency: meta.currency,
-        timeZone,
-        bars: sessions ? lastSessions(bars, timeZone, sessions) : bars,
-      };
+      const from = "sessions" in spec ? sessionStart(bars, timeZone, spec.sessions) : seconds(spec.start(now));
+      return { symbol: meta.symbol, range, interval, currency: meta.currency, timeZone, from: from ?? seconds(now), bars };
     }),
   );
 }
@@ -127,12 +134,13 @@ export function toBars(rows: ChartResultArrayQuote[]): Bar[] {
   });
 }
 
-/** Bars from the last `sessions` trading days, by date in the exchange's time zone. */
-export function lastSessions(bars: Bar[], timeZone: string, sessions: number): Bar[] {
+/** When the last `sessions` trading days begin, by date in the exchange's time zone. */
+export function sessionStart(bars: Bar[], timeZone: string, sessions: number): number | undefined {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
   const dates = bars.map((b) => day.format(b.time * 1000));
-  const keep = new Set([...new Set(dates)].slice(-sessions));
-  return bars.filter((_, i) => keep.has(dates[i]));
+  const unique = [...new Set(dates)];
+  const first = dates.indexOf(unique[Math.max(0, unique.length - sessions)]);
+  return first === -1 ? undefined : bars[first].time;
 }
 
 export function toProfile(symbol: string, r: QuoteSummaryResult): Profile {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import { clearCache } from "../cache";
-import { chart, lastSessions, profile, quote } from "./yahoo";
+import { chart, profile, quote, sessionStart } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn() }));
 
@@ -111,11 +111,28 @@ describe("chart", () => {
     expect(yahoo.chart.mock.calls.every(([, options]) => options.includePrePost === false)).toBe(true);
   });
 
-  it("keeps only the last trading day for 1D", async () => {
+  it("starts 1D at the last trading day, keeping earlier days as history", async () => {
     yahoo.chart.mockResolvedValue(
       chartResult([bar("2026-10-27T19:55:00Z", 1), bar("2026-10-28T13:30:00Z", 2), bar("2026-10-28T19:55:00Z", 3)]),
     );
-    expect((await chart("AAPL", "1D")).bars.map((b) => b.close)).toEqual([2, 3]);
+    const result = await chart("AAPL", "1D");
+    expect(result.from).toBe(Date.parse("2026-10-28T13:30:00Z") / 1000);
+    expect(result.bars.map((b) => b.close)).toEqual([1, 2, 3]);
+  });
+
+  it("fetches about 200 bars of history before a daily or weekly range", async () => {
+    vi.useFakeTimers({ now: new Date("2026-10-28T20:00:00Z") });
+    yahoo.chart.mockResolvedValue(chartResult([]));
+
+    const sixMonths = await chart("AAPL", "6M");
+    const fiveYears = await chart("AAPL", "5Y");
+    vi.useRealTimers();
+
+    const daysBefore = (from: number, period1: Date) => (from * 1000 - period1.getTime()) / 864e5;
+    const [[, daily], [, weekly]] = yahoo.chart.mock.calls;
+    expect(sixMonths.from).toBe(Date.parse("2026-04-28T20:00:00Z") / 1000);
+    expect(daysBefore(sixMonths.from, daily.period1)).toBeGreaterThanOrEqual(290); // 200 trading days
+    expect(daysBefore(fiveYears.from, weekly.period1)).toBeGreaterThanOrEqual(1400); // 200 weeks
   });
 
   it("answers an unknown symbol with a 404", async () => {
@@ -129,15 +146,21 @@ describe("chart", () => {
   });
 });
 
-describe("lastSessions", () => {
+describe("sessionStart", () => {
   const at = (iso: string) => ({ time: Date.parse(iso) / 1000, open: 1, high: 1, low: 1, close: 1, volume: 0 });
 
   it("groups bars by date in the exchange's time zone", () => {
     // 02:00 UTC on the 28th is still the 27th in New York.
     const bars = [at("2026-10-26T15:00:00Z"), at("2026-10-28T02:00:00Z"), at("2026-10-28T15:00:00Z")];
-    expect(lastSessions(bars, "America/New_York", 1)).toEqual([bars[2]]);
-    expect(lastSessions(bars, "America/New_York", 2)).toEqual([bars[1], bars[2]]);
-    expect(lastSessions(bars, "UTC", 1)).toEqual([bars[1], bars[2]]);
+    expect(sessionStart(bars, "America/New_York", 1)).toBe(bars[2].time);
+    expect(sessionStart(bars, "America/New_York", 2)).toBe(bars[1].time);
+    expect(sessionStart(bars, "UTC", 1)).toBe(bars[1].time);
+  });
+
+  it("starts at the first bar when there are fewer sessions than asked", () => {
+    const bars = [at("2026-10-27T15:00:00Z"), at("2026-10-28T15:00:00Z")];
+    expect(sessionStart(bars, "America/New_York", 5)).toBe(bars[0].time);
+    expect(sessionStart([], "America/New_York", 1)).toBeUndefined();
   });
 });
 

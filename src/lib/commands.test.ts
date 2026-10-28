@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCommand, parseCommand } from "./commands";
+import { commandTitle, formatCommand, parseCommand } from "./commands";
 
 function ok(input: string) {
   const result = parseCommand(input);
@@ -72,5 +72,17 @@ describe("parseCommand", () => {
 describe("formatCommand", () => {
   it.each(["AAPL GP", "WEI", "ECO UNRATE", "W GP", "EURUSD=X GP"])("round-trips %s", (input) => {
     expect(formatCommand(ok(input))).toBe(input);
+  });
+});
+
+describe("commandTitle", () => {
+  it.each([
+    ["AAPL GP", "AAPL · Price chart"],
+    ["ECO UNRATE", "Economy · UNRATE"],
+    ["W", "Watchlist"],
+  ])("%s → %s", (input, expected) => {
+    const result = parseCommand(input);
+    if (!result.ok) throw new Error(result.error);
+    expect(commandTitle(result.command)).toBe(expected);
   });
 });

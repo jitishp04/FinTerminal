@@ -171,6 +171,7 @@ describe("profile", () => {
       assetProfile: { sector: "Technology", industry: "Consumer Electronics", longBusinessSummary: "Apple designs…", fullTimeEmployees: 166000 },
       summaryDetail: { marketCap: 5.03e12, trailingPE: 41.2, dividendYield: 0.003, fiftyTwoWeekHigh: 350, fiftyTwoWeekLow: 200 },
       defaultKeyStatistics: { trailingEps: 8.36, sharesOutstanding: 14.6e9 },
+      financialData: { grossMargins: 0.47, operatingMargins: 0.32, profitMargins: 0.27 },
     });
 
     expect(await profile("AAPL")).toMatchObject({
@@ -184,13 +185,17 @@ describe("profile", () => {
       peRatio: 41.2,
       eps: 8.36,
       dividendYield: 0.003,
+      grossMargin: 0.47,
+      operatingMargin: 0.32,
+      profitMargin: 0.27,
     });
+    expect(yahoo.quoteSummary.mock.calls[0][1].modules).toContain("financialData");
   });
 
-  it("reads a fund's category, assets and yield", async () => {
+  it("reads a fund's category, assets, expense ratio and yield", async () => {
     yahoo.quoteSummary.mockResolvedValue({
       price: { symbol: "SPY", longName: null, shortName: "SPDR S&P 500", quoteType: "ETF" },
-      fundProfile: { categoryName: "Large Blend" },
+      fundProfile: { categoryName: "Large Blend", feesExpensesInvestment: { annualReportExpenseRatio: 0.000945 } },
       summaryDetail: { totalAssets: 8.09e11, yield: 0.011 },
     });
 
@@ -199,6 +204,7 @@ describe("profile", () => {
       type: "ETF",
       category: "Large Blend",
       totalAssets: 8.09e11,
+      expenseRatio: 0.000945,
       dividendYield: 0.011,
     });
   });

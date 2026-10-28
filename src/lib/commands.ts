@@ -13,6 +13,9 @@ const SYMBOL = /^[A-Z0-9^=.-]{1,15}$/;
 // FRED series ids, e.g. UNRATE, A191RL1Q225SBEA
 const ARG = /^[A-Z0-9_]{1,30}$/;
 
+export const isSymbol = (token: string) => SYMBOL.test(token);
+export const isArg = (token: string) => ARG.test(token);
+
 const fail = (error: string): ParseResult => ({ ok: false, error });
 
 /** Parses `[SYMBOL] FUNCTION [ARG]`, case-insensitive. */
@@ -35,6 +38,12 @@ export function parseCommand(input: string): ParseResult {
 /** Inverse of parseCommand: `{ fn: "GP", symbol: "AAPL" }` → `"AAPL GP"`. */
 export function formatCommand(command: Command): string {
   return [command.symbol, command.fn, ...command.args].filter(Boolean).join(" ");
+}
+
+/** Plain-English name: `"AAPL · Price chart"`, `"Economy · UNRATE"`, `"Watchlist"`. */
+export function commandTitle(command: Command): string {
+  const title = FUNCTION_BY_CODE.get(command.fn)?.title ?? command.fn;
+  return [command.symbol, title, ...command.args].filter(Boolean).join(" · ");
 }
 
 function build(def: FunctionDef, symbol: string | undefined, args: string[]): ParseResult {

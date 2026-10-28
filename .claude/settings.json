@@ -1,20 +1,17 @@
 {
-  "enabledPlugins": {
-    "agent-skills@addy-agent-skills": true,
-    "andrej-karpathy-skills@karpathy-skills": true
-  },
-  "extraKnownMarketplaces": {
-    "addy-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "addyosmani/agent-skills"
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/install-deps.mjs\"",
+            "timeout": 600,
+            "statusMessage": "Checking npm dependencies"
+          }
+        ]
       }
-    },
-    "karpathy-skills": {
-      "source": {
-        "source": "github",
-        "repo": "forrestchang/andrej-karpathy-skills"
-      }
-    }
+    ]
   }
 }

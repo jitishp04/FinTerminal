@@ -8,7 +8,5 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
-    // No tests yet; issue #2 adds the first ones (command parser).
-    passWithNoTests: true,
   },
 });

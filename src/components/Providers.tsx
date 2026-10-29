@@ -6,12 +6,15 @@ import { FetchError } from "@/lib/fetchApi";
 
 let browserQueryClient: QueryClient | undefined;
 
+/** A 4xx (unknown symbol, bad input) won't change by asking again. */
+const isClientError = (error: unknown) => error instanceof FetchError && error.status >= 400 && error.status < 500;
+
 function newQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // A 4xx (unknown symbol, bad input) won't change on retry.
-        retry: (failures, error) => failures < 2 && !(error instanceof FetchError && error.status >= 400 && error.status < 500),
+        retry: (failures, error) => failures < 2 && !isClientError(error),
+        refetchOnWindowFocus: (query) => !isClientError(query.state.error),
       },
     },
   });

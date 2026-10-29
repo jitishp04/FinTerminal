@@ -64,6 +64,8 @@ export interface Profile {
   marketCap?: number;
   /** Funds: assets under management. */
   totalAssets?: number;
+  /** Funds, as a fraction: 0.000945 means 0.0945% a year. */
+  expenseRatio?: number;
   peRatio?: number;
   forwardPE?: number;
   eps?: number;
@@ -74,4 +76,8 @@ export interface Profile {
   week52Low?: number;
   averageVolume?: number;
   sharesOutstanding?: number;
+  /** Fractions of revenue, trailing twelve months. */
+  grossMargin?: number;
+  operatingMargin?: number;
+  profitMargin?: number;
 }

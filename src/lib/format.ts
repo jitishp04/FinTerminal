@@ -24,3 +24,24 @@ export function formatChange(value: number, decimals: number): string {
 export function formatPercent(value: number): string {
   return `${fixed(2, true).format(value)}%`;
 }
+
+/** From a fraction, unsigned: `0.0071` → `0.71%`. Tiny ones keep two significant digits: `0.000945` → `0.095%`. */
+export function formatFraction(value: number): string {
+  const percent = value * 100;
+  if (percent !== 0 && Math.abs(percent) < 0.1) return `${percent.toPrecision(2)}%`;
+  return `${fixed(2).format(percent)}%`;
+}
+
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumSignificantDigits: 3 });
+
+/** Three significant digits with a suffix: `3.83T`, `45.6B`, `22.1M`, `950`. */
+export function formatCompact(value: number): string {
+  return compact.format(value);
+}
+
+const whole = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+/** Grouped whole number: `228,000`. */
+export function formatInteger(value: number): string {
+  return whole.format(value);
+}

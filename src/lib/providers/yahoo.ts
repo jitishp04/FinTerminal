@@ -74,8 +74,9 @@ export function profile(symbol: string): Promise<Profile> {
     orNotFound(symbol, async () =>
       toProfile(
         symbol,
+        // Yahoo skips modules a symbol lacks (financialData for funds) as long as one is present.
         await yahoo.quoteSummary(symbol, {
-          modules: ["price", "summaryDetail", "assetProfile", "defaultKeyStatistics", "fundProfile"],
+          modules: ["price", "summaryDetail", "assetProfile", "defaultKeyStatistics", "fundProfile", "financialData"],
         }),
       ),
     ),
@@ -145,6 +146,7 @@ export function sessionStart(bars: Bar[], timeZone: string, sessions: number): n
 
 export function toProfile(symbol: string, r: QuoteSummaryResult): Profile {
   const { price, summaryDetail: detail, assetProfile: about, defaultKeyStatistics: stats, fundProfile: fund } = r;
+  const financials = r.financialData;
   return {
     symbol: price?.symbol ?? symbol,
     name: price?.longName ?? price?.shortName ?? symbol,
@@ -160,6 +162,7 @@ export function toProfile(symbol: string, r: QuoteSummaryResult): Profile {
     category: fund?.categoryName ?? undefined,
     marketCap: detail?.marketCap,
     totalAssets: detail?.totalAssets,
+    expenseRatio: fund?.feesExpensesInvestment?.annualReportExpenseRatio ?? stats?.annualReportExpenseRatio,
     peRatio: detail?.trailingPE,
     forwardPE: detail?.forwardPE ?? stats?.forwardPE,
     eps: stats?.trailingEps,
@@ -169,5 +172,8 @@ export function toProfile(symbol: string, r: QuoteSummaryResult): Profile {
     week52Low: detail?.fiftyTwoWeekLow,
     averageVolume: detail?.averageVolume,
     sharesOutstanding: stats?.sharesOutstanding,
+    grossMargin: financials?.grossMargins,
+    operatingMargin: financials?.operatingMargins,
+    profitMargin: financials?.profitMargins ?? stats?.profitMargins,
   };
 }

@@ -5,15 +5,20 @@ import { commandTitle, type Command } from "@/lib/commands";
 import { FUNCTION_BY_CODE } from "@/lib/functions";
 import { Help } from "./functions/Help";
 
-// The chart draws on a canvas and fetches in the browser, so it never renders on the server.
+// Data panels fetch in the browser (and the chart draws on a canvas), so they never render on the server.
 const PriceChart = dynamic(() => import("./functions/PriceChart").then((m) => m.PriceChart), {
   ssr: false,
   loading: () => <p className="text-muted">Loading chart…</p>,
+});
+const CompanyOverview = dynamic(() => import("./functions/CompanyOverview").then((m) => m.CompanyOverview), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading overview…</p>,
 });
 
 export function FunctionView({ command, onOpen }: { command: Command; onOpen: (command: Command) => void }) {
   if (command.fn === "HELP") return <Help onOpen={onOpen} />;
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
+  if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
       <p className="font-semibold">{commandTitle(command)}</p>

@@ -7,14 +7,6 @@ const nextConfig: NextConfig = {
   // Compile and runtime errors still show without it.
   devIndicators: false,
   partialPrefetching: true,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
 };
 
 export default nextConfig;

@@ -14,11 +14,16 @@ const CompanyOverview = dynamic(() => import("./functions/CompanyOverview").then
   ssr: false,
   loading: () => <p className="text-muted">Loading overview…</p>,
 });
+const Watchlist = dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading watchlist…</p>,
+});
 
 export function FunctionView({ command, onOpen }: { command: Command; onOpen: (command: Command) => void }) {
   if (command.fn === "HELP") return <Help onOpen={onOpen} />;
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
+  if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
       <p className="font-semibold">{commandTitle(command)}</p>

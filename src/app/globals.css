@@ -26,6 +26,19 @@
   --color-link: var(--link);
   --color-violet: var(--violet);
   --font-mono: var(--font-terminal);
+  --animate-flash-up: flash-up 1s ease-out;
+  --animate-flash-down: flash-down 1s ease-out;
+
+  @keyframes flash-up {
+    from {
+      background-color: color-mix(in srgb, var(--up) 45%, transparent);
+    }
+  }
+  @keyframes flash-down {
+    from {
+      background-color: color-mix(in srgb, var(--down) 45%, transparent);
+    }
+  }
 }
 
 html {

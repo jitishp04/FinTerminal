@@ -40,7 +40,7 @@ export function QuoteMonitor({ groups, onOpen }: QuoteMonitorProps) {
                 {group.title}
               </th>
             </tr>
-            {group.items.map(({ symbol, name }) => {
+            {group.items.map(({ symbol, name, unit, decimals }) => {
               const quote = quotes.get(symbol);
               return (
                 <tr
@@ -57,9 +57,10 @@ export function QuoteMonitor({ groups, onOpen }: QuoteMonitorProps) {
                       className="block max-w-full truncate font-semibold text-amber focus-visible:outline focus-visible:outline-amber"
                     >
                       {name}
+                      {unit && <span className="ml-1.5 text-xs font-normal text-muted">{unit}</span>}
                     </button>
                   </td>
-                  <QuoteCells quote={quote} loading={loading} />
+                  <QuoteCells quote={quote} loading={loading} decimals={decimals} />
                   <td className="hidden text-muted @md:table-cell">
                     {quote?.time === undefined ? "—" : formatUpdated(quote.time, new Date(updatedAt))}
                   </td>

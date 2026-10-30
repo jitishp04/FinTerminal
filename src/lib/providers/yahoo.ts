@@ -44,12 +44,21 @@ const RANGES: Record<
   "5Y": { interval: "1wk", days: 1827 + WEEKLY_HISTORY, start: daysAgo(1827), ttl: 10 * MINUTE },
 };
 
-/** Latest quotes in one Yahoo request. Unknown symbols are left out. */
+/** Yahoo's `JPY=X` means USD/JPY, so `USDJPY=X` is the same pair, and it may answer with either name. */
+const samePair = (symbol: string) => symbol.replace(/^USD([A-Z]{3}=X)$/, "$1");
+
+/** Latest quotes in one Yahoo request, under the symbols asked for. Unknown symbols are left out. */
 export function quote(symbols: string[]): Promise<Quote[]> {
   const unique = [...new Set(symbols)];
-  return cached(`quote:${unique.join(",")}`, QUOTE_TTL, async () =>
-    (await yahoo.quote(unique)).flatMap((q) => toQuote(q) ?? []),
-  );
+  return cached(`quote:${unique.join(",")}`, QUOTE_TTL, async () => {
+    // Yahoo answers some symbols with a stub (BRK.B). Validating would throw away the whole batch for it.
+    const rows = (await yahoo.quote(unique, {}, { validateResult: false })) as YahooQuote[];
+    const asked = new Map(unique.map((symbol) => [samePair(symbol), symbol]));
+    return rows.flatMap((row) => {
+      const quote = toQuote(row);
+      return quote ? [{ ...quote, symbol: asked.get(samePair(quote.symbol)) ?? quote.symbol }] : [];
+    });
+  });
 }
 
 /** Price bars for `range`, with the bar size the range calls for, plus history before it. */
@@ -99,7 +108,7 @@ async function orNotFound<T>(symbol: string, load: () => Promise<T>): Promise<T>
 const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
 
 export function toQuote(q: YahooQuote): Quote | undefined {
-  if (q.regularMarketPrice === undefined) return undefined;
+  if (typeof q.regularMarketPrice !== "number") return undefined;
   return {
     symbol: q.symbol,
     name: q.longName ?? q.shortName ?? q.symbol,

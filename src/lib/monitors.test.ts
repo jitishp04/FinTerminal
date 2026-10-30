@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isSymbol } from "./commands";
-import { COMMODITIES, CURRENCIES, MONITORS, WORLD_INDICES } from "./monitors";
+import { COMMODITIES, CURRENCIES, MONITORS, SECTORS, WORLD_INDICES } from "./monitors";
 import { MAX_QUOTE_SYMBOLS } from "./types";
 
 const titles = (groups: typeof WORLD_INDICES) => groups.map((group) => group.title);
@@ -10,6 +10,14 @@ describe("monitor groups", () => {
     expect(titles(WORLD_INDICES)).toEqual(["Americas", "EMEA", "Asia-Pacific"]);
     expect(titles(CURRENCIES)).toEqual(["Majors", "Crosses", "Emerging markets", "US dollar"]);
     expect(titles(COMMODITIES)).toEqual(["Energy", "Metals", "Agriculture"]);
+  });
+});
+
+describe("SECTORS", () => {
+  it("lists the 11 sector ETFs once each, in a form the quote route accepts", () => {
+    const symbols = SECTORS.map((sector) => sector.symbol);
+    expect(new Set(symbols).size).toBe(11);
+    expect(symbols.filter((symbol) => !isSymbol(symbol))).toEqual([]);
   });
 });
 

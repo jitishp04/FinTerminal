@@ -14,6 +14,21 @@ export interface MonitorGroup {
   items: MonitorItem[];
 }
 
+/** The SPDR sector ETFs, largest first, as `SECT` lays them out. */
+export const SECTORS: MonitorItem[] = [
+  { symbol: "XLK", name: "Technology" },
+  { symbol: "XLF", name: "Financials" },
+  { symbol: "XLV", name: "Health Care" },
+  { symbol: "XLY", name: "Discretionary" },
+  { symbol: "XLP", name: "Staples" },
+  { symbol: "XLE", name: "Energy" },
+  { symbol: "XLI", name: "Industrials" },
+  { symbol: "XLB", name: "Materials" },
+  { symbol: "XLU", name: "Utilities" },
+  { symbol: "XLRE", name: "Real Estate" },
+  { symbol: "XLC", name: "Communication" },
+];
+
 export const WORLD_INDICES: MonitorGroup[] = [
   {
     title: "Americas",

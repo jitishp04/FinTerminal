@@ -4,7 +4,7 @@ import type { Quote as YahooQuote } from "yahoo-finance2/modules/quote";
 import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-iface";
 import { ApiError } from "../api";
 import { cached } from "../cache";
-import type { Bar, Chart, ChartRange, Profile, Quote } from "../types";
+import type { Bar, Chart, ChartRange, MoverType, Profile, Quote } from "../types";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
 const yahoo = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
@@ -15,7 +15,11 @@ const DAY = 24 * 60 * MINUTE;
 
 // Under the watchlist's 10 s poll: the TTL starts when Yahoo answers, so at 10 s every other poll would be a cache hit.
 const QUOTE_TTL = 8 * SECOND;
+// Under the 60 s poll, for the same reason.
+const MOVERS_TTL = 50 * SECOND;
 const PROFILE_TTL = 60 * MINUTE;
+
+const MOVERS_COUNT = 25;
 
 const daysAgo = (days: number) => (now: Date) => new Date(now.getTime() - days * DAY);
 const startOfYear = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
@@ -44,6 +48,13 @@ const RANGES: Record<
   "5Y": { interval: "1wk", days: 1827 + WEEKLY_HISTORY, start: daysAgo(1827), ttl: 10 * MINUTE },
 };
 
+/** Yahoo's list for each mover type, and how to rank it: Yahoo's own order isn't strict. */
+const MOVER_LISTS = {
+  gainers: { scrIds: "day_gainers", rank: (q: Quote) => -(q.changePercent ?? 0) },
+  losers: { scrIds: "day_losers", rank: (q: Quote) => q.changePercent ?? 0 },
+  actives: { scrIds: "most_actives", rank: (q: Quote) => -(q.volume ?? 0) },
+} as const;
+
 /** Yahoo's `JPY=X` means USD/JPY, so `USDJPY=X` is the same pair, and it may answer with either name. */
 const samePair = (symbol: string) => symbol.replace(/^USD([A-Z]{3}=X)$/, "$1");
 
@@ -58,6 +69,25 @@ export function quote(symbols: string[]): Promise<Quote[]> {
       const quote = toQuote(row);
       return quote ? [{ ...quote, symbol: asked.get(samePair(quote.symbol)) ?? quote.symbol }] : [];
     });
+  });
+}
+
+/** One list of the day's top US stocks, best ranked first. */
+export function movers(type: MoverType): Promise<Quote[]> {
+  const { scrIds, rank } = MOVER_LISTS[type];
+  return cached(`movers:${type}`, MOVERS_TTL, async () => {
+    // Not validated, for the same reason as quote().
+    const options = { scrIds, count: MOVERS_COUNT };
+    const { quotes } = (await yahoo.screener(options, undefined, { validateResult: false })) as {
+      quotes: { regularMarketTime?: number }[];
+    };
+    return quotes
+      .flatMap((row) => {
+        // The same fields as quote(), except that the time comes in epoch seconds.
+        const time = row.regularMarketTime;
+        return toQuote({ ...row, regularMarketTime: time && new Date(time * 1000) } as unknown as YahooQuote) ?? [];
+      })
+      .sort((a, b) => rank(a) - rank(b));
   });
 }
 

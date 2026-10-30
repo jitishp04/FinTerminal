@@ -23,12 +23,22 @@ const QuoteMonitor = dynamic(() => import("./functions/QuoteMonitor").then((m) =
   ssr: false,
   loading: () => <p className="text-muted">Loading prices…</p>,
 });
+const SectorHeatmap = dynamic(() => import("./functions/SectorHeatmap").then((m) => m.SectorHeatmap), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading sectors…</p>,
+});
+const TopMovers = dynamic(() => import("./functions/TopMovers").then((m) => m.TopMovers), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading movers…</p>,
+});
 
 export function FunctionView({ command, onOpen }: { command: Command; onOpen: (command: Command) => void }) {
   if (command.fn === "HELP") return <Help onOpen={onOpen} />;
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
+  if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
+  if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;
   const monitor = MONITORS[command.fn];
   if (monitor) return <QuoteMonitor groups={monitor} onOpen={onOpen} />;
   return (

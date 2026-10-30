@@ -7,6 +7,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { CHART_RANGES, type Chart, type ChartRange } from "@/lib/types";
 import { CandleChart, OVERLAY_COLORS, type ChartStyle } from "./CandleChart";
 import { QuoteLine } from "./QuoteLine";
+import { Toggle } from "./Toggle";
 
 const MINUTE = 60_000;
 const STYLES: ChartStyle[] = ["Candles", "Line"];
@@ -81,19 +82,6 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
     <div role="group" aria-label={label} className="flex items-center gap-0.5">
       {children}
     </div>
-  );
-}
-
-function Toggle({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`flex items-center rounded-sm px-1.5 py-0.5 ${pressed ? "bg-border text-amber" : "text-muted hover:bg-border hover:text-foreground"}`}
-    >
-      {children}
-    </button>
   );
 }
 

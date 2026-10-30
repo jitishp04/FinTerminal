@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Side-session worktrees the desktop app keeps inside the project.
+    ".claude/worktrees/**",
   ]),
 ]);
 

@@ -1,24 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { Fragment } from "react";
-import { fetchApi } from "@/lib/fetchApi";
 import { formatInteger } from "@/lib/format";
 import { keyStats, typeLabel } from "@/lib/keyStats";
-import type { Profile } from "@/lib/types";
 import { QuoteLine } from "./QuoteLine";
-
-const REFRESH = 10 * 60_000;
+import { useProfile } from "./useProfile";
 
 /** DES: what the company or fund is, and its key stats. */
 export function CompanyOverview({ symbol }: { symbol: string }) {
-  const profile = useQuery({
-    queryKey: ["profile", symbol],
-    queryFn: () => fetchApi<Profile>(`/api/profile?symbol=${encodeURIComponent(symbol)}`),
-    refetchInterval: REFRESH,
-    // Fresh until the next poll, so switching windows doesn't refetch it.
-    staleTime: REFRESH,
-  });
+  const profile = useProfile(symbol);
 
   if (profile.isPending) return <p className="text-muted">Loading overview…</p>;
   if (profile.isError) return <p role="alert">{profile.error.message}</p>;

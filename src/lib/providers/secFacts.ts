@@ -25,7 +25,10 @@ export interface CompanyFacts {
 interface LineSpec {
   key: string;
   label: string;
-  /** Tried in order, for each period on its own: companies change tags over the years. */
+  /**
+   * Tried in order, for each period on its own: companies change tags over the years.
+   * Only tags that mean the whole line: a narrower one would show a believable wrong number.
+   */
   tags: string[];
   unit?: StatementLine["unit"];
 }
@@ -36,9 +39,10 @@ const INCOME: LineSpec[] = [
     label: "Revenue",
     tags: [
       "RevenuesNetOfInterestExpense",
+      // Ahead of contract revenue, which leaves out lease income and insurance premiums.
+      "Revenues",
       "RevenueFromContractWithCustomerExcludingAssessedTax",
       "RevenueFromContractWithCustomerIncludingAssessedTax",
-      "Revenues",
       "SalesRevenueNet",
       "SalesRevenueGoodsNet",
     ],
@@ -54,11 +58,7 @@ const INCOME: LineSpec[] = [
     label: "Research and development",
     tags: ["ResearchAndDevelopmentExpense", "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"],
   },
-  {
-    key: "sellingGeneralAdministrative",
-    label: "Selling, general and admin",
-    tags: ["SellingGeneralAndAdministrativeExpense", "GeneralAndAdministrativeExpense"],
-  },
+  { key: "sellingGeneralAdministrative", label: "Selling, general and admin", tags: ["SellingGeneralAndAdministrativeExpense"] },
   {
     key: "operatingExpenses",
     label: "Operating expenses",
@@ -107,7 +107,12 @@ const BALANCE: LineSpec[] = [
   {
     key: "shortTermInvestments",
     label: "Short-term investments",
-    tags: ["MarketableSecuritiesCurrent", "ShortTermInvestments", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"],
+    tags: [
+      "MarketableSecuritiesCurrent",
+      "ShortTermInvestments",
+      "OtherShortTermInvestments",
+      "AvailableForSaleSecuritiesDebtSecuritiesCurrent",
+    ],
   },
   { key: "receivables", label: "Receivables", tags: ["AccountsReceivableNetCurrent", "ReceivablesNetCurrent"] },
   { key: "inventory", label: "Inventory", tags: ["InventoryNet"] },
@@ -169,7 +174,6 @@ const CASH_FLOW: LineSpec[] = [
       "DepreciationDepletionAndAmortization",
       "DepreciationAmortizationAndAccretionNet",
       "DepreciationAndAmortization",
-      "Depreciation",
     ],
   },
   { key: "stockCompensation", label: "Stock-based compensation", tags: ["ShareBasedCompensation"] },

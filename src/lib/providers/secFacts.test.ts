@@ -173,6 +173,38 @@ describe("which number wins", () => {
     }
   });
 
+  it("prefers the statement's own line to a component of it, as at Pfizer", () => {
+    const total = company("OtherShortTermInvestments", [[undefined, "2025-12-31", 12, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const part = company("AvailableForSaleSecuritiesDebtSecuritiesCurrent", [[undefined, "2025-12-31", 9, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const sales = company("Revenues", [["2025-01-01", "2025-12-31", 100, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const facts = {
+      entityName: "Test Co",
+      facts: { "us-gaap": { ...part.facts["us-gaap"], ...total.facts["us-gaap"], ...sales.facts["us-gaap"] } },
+    };
+    expect(value(statements(facts, "annual"), "balance", "shortTermInvestments", "FY2025")).toBe(12);
+  });
+
+  it("reads total revenue ahead of contract revenue, which leaves out an insurer's premiums", () => {
+    const contract = company("RevenueFromContractWithCustomerExcludingAssessedTax", [["2025-01-01", "2025-12-31", 247, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const total = company("Revenues", [["2025-01-01", "2025-12-31", 370, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const facts = { entityName: "Test Co", facts: { "us-gaap": { ...contract.facts["us-gaap"], ...total.facts["us-gaap"] } } };
+    expect(value(statements(facts, "annual"), "income", "revenue", "FY2025")).toBe(370);
+  });
+
+  it("doesn't pass general and admin costs off as selling, general and admin", () => {
+    const admin = company("GeneralAndAdministrativeExpense", [["2025-01-01", "2025-12-31", 5, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const sales = company("Revenues", [["2025-01-01", "2025-12-31", 100, "a", 2025, "FY", "10-K", "2026-02-01"]]);
+    const facts = { entityName: "Test Co", facts: { "us-gaap": { ...admin.facts["us-gaap"], ...sales.facts["us-gaap"] } } };
+    expect(value(statements(facts, "annual"), "income", "sellingGeneralAdministrative", "FY2025")).toBeNull();
+  });
+
+  it("leaves a line blank rather than fill it with something narrower, as with Microsoft's depreciation", () => {
+    const depreciation = company("Depreciation", [["2025-07-01", "2026-06-30", 34, "a", 2026, "FY", "10-K", "2026-07-30"]]);
+    const sales = company("Revenues", [["2025-07-01", "2026-06-30", 100, "a", 2026, "FY", "10-K", "2026-07-30"]]);
+    const facts = { entityName: "Test Co", facts: { "us-gaap": { ...depreciation.facts["us-gaap"], ...sales.facts["us-gaap"] } } };
+    expect(value(statements(facts, "annual"), "cashFlow", "depreciation", "FY2026")).toBeNull();
+  });
+
   it("names a period from its own filing, not from a later filing's comparison column", () => {
     // A new holding company's first 10-Q: last year's quarter sits in it, tagged with this year's fy and fp.
     const facts = company("Revenues", [

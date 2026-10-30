@@ -15,6 +15,10 @@ const CompanyOverview = dynamic(() => import("./functions/CompanyOverview").then
   ssr: false,
   loading: () => <p className="text-muted">Loading overview…</p>,
 });
+const FinancialStatements = dynamic(
+  () => import("./functions/FinancialStatements").then((m) => m.FinancialStatements),
+  { ssr: false, loading: () => <p className="text-muted">Loading statements…</p> },
+);
 const Watchlist = dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
   ssr: false,
   loading: () => <p className="text-muted">Loading watchlist…</p>,
@@ -36,6 +40,7 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "HELP") return <Help onOpen={onOpen} />;
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
+  if (command.fn === "FA" && command.symbol) return <FinancialStatements symbol={command.symbol} />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;

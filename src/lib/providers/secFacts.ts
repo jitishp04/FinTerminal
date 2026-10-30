@@ -209,6 +209,7 @@ const SHARE_BASIS = {
   basicEps: { tags: ["EarningsPerShareBasic", "EarningsPerShareBasicAndDiluted"], units: "USD/shares" },
   dilutedEps: { tags: ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"], units: "USD/shares" },
   netIncome: { tags: ["NetIncomeLoss", "ProfitLoss"], units: "USD" },
+  commonIncome: { tags: ["NetIncomeLossAvailableToCommonStockholdersBasic"], units: "USD" },
 };
 
 /** Share counts and EPS are rounded, so restated figures land near a split's ratio, not on it. */
@@ -224,6 +225,11 @@ const SMALLEST_TELLING_EPS = 0.25;
 // EPS can be restated by less than this for other reasons, while income stays the same.
 const SMALLEST_SPLIT_FROM_EPS_ALONE = 2;
 
+/** A count in the wrong scale is off by a power of this: thousands, millions, or three zeros too many. */
+const SCALE_STEP = 1000;
+// Preferred dividends and rounding to the cent keep a right count this far from income over EPS.
+const SCALE_TOLERANCE = 2;
+
 type Gaap = NonNullable<CompanyFacts["facts"]["us-gaap"]>;
 /** A line's reported values by `end/quarters`, where 0 quarters is a point in time. */
 type Series = Map<string, number>;
@@ -235,7 +241,20 @@ interface FiscalPeriod {
   quarter: number;
 }
 
-type ShareBasis = Partial<Record<keyof typeof SHARE_BASIS, number>> & { filed: string };
+type ShareBasis = Partial<Record<keyof typeof SHARE_BASIS, number>> & {
+  accn: string;
+  end: string;
+  quarters: number;
+  filed: string;
+};
+
+/** A filing's diluted count for a period, and the scale income over EPS puts it in. */
+interface ScaledCount {
+  key: string;
+  end: string;
+  count: number;
+  scale: number;
+}
 
 /** Two filings of a period, and how far its share count moved between them by each measure, as new over old. */
 interface Restatement {
@@ -290,7 +309,7 @@ function filedShareBases(gaap: Gaap): ShareBasis[][] {
         if (!quarters || !isPeriodicReport(fact)) continue;
         const key = seriesKey(fact.end, quarters);
         const filings = periods.get(key) ?? new Map<string, ShareBasis>();
-        const basis = filings.get(fact.accn) ?? { filed: fact.filed };
+        const basis = filings.get(fact.accn) ?? { accn: fact.accn, end: fact.end, quarters, filed: fact.filed };
         basis[field as keyof typeof SHARE_BASIS] ??= fact.val;
         periods.set(key, filings.set(fact.accn, basis));
       }
@@ -299,6 +318,65 @@ function filedShareBases(gaap: Gaap): ShareBasis[][] {
   return [...periods.values()].map((filings) =>
     [...filings.values()].sort((a, b) => a.filed.localeCompare(b.filed)),
   );
+}
+
+/** The power of 1,000 that brings a count nearest to `other`: 1 if they're in the same scale. */
+const scaleBetween = (count: number, other: number) =>
+  SCALE_STEP ** Math.round(Math.log(other / count) / Math.log(SCALE_STEP));
+
+/** The scale that makes a count match income over EPS, or undefined if none clearly does. */
+function scaleFromIncome(count: number, eps: number | undefined, netIncome: number | undefined) {
+  if (!eps || !netIncome) return undefined;
+  const implied = Math.abs(netIncome / eps);
+  const scale = scaleBetween(count, implied);
+  const fit = (count * scale) / implied;
+  return fit >= 1 / SCALE_TOLERANCE && fit <= SCALE_TOLERANCE ? scale : undefined;
+}
+
+const countKey = (accn: string, end: string, quarters: number) => `${accn}/${seriesKey(end, quarters)}`;
+
+/** Every diluted count in a company's filings that income over EPS can place. */
+function scaledCounts(gaap: Gaap): ScaledCount[] {
+  return filedShareBases(gaap)
+    .flat()
+    .flatMap(({ accn, end, quarters, dilutedShares: count, dilutedEps, netIncome, commonIncome }) => {
+      const scale = count ? scaleFromIncome(count, dilutedEps, netIncome ?? commonIncome) : undefined;
+      return count && scale ? [{ key: countKey(accn, end, quarters), end, count, scale }] : [];
+    });
+}
+
+/**
+ * A company's facts with its diluted counts in whole shares. Filings sometimes tag a count
+ * in thousands or millions, or with three zeros too many. Income over EPS shows that
+ * something's off, but not what: Halliburton's counts are right and its EPS is tagged in
+ * millions. So the count that matches income nearest in time has to show the same scale,
+ * and any count where they differ stays as filed. It's nearest in time as a company's
+ * shares can change a lot over the years, and a filing's own columns can be in two scales.
+ */
+function inWholeShares(gaap: Gaap): Gaap {
+  const counts = scaledCounts(gaap);
+  const matching = counts.filter(({ scale }) => scale === 1);
+  if (matching.length === 0) return gaap;
+
+  const wrongScale = new Map<string, number>();
+  for (const { key, end, count, scale } of counts) {
+    if (scale === 1) continue;
+    const apart = (other: ScaledCount) => Math.abs(Date.parse(other.end) - Date.parse(end));
+    const nearest = matching.reduce((best, other) => (apart(other) < apart(best) ? other : best));
+    if (scaleBetween(count, nearest.count) === scale) wrongScale.set(key, scale);
+  }
+  if (wrongScale.size === 0) return gaap;
+
+  const inScale = (fact: Fact) => {
+    const scale = wrongScale.get(countKey(fact.accn, fact.end, quartersSpanned(fact) ?? 0));
+    return scale ? { ...fact, val: Math.round(fact.val * scale) } : fact;
+  };
+  const corrected = { ...gaap };
+  for (const tag of SHARE_BASIS.dilutedShares.tags) {
+    const shares = gaap[tag]?.units.shares;
+    if (shares) corrected[tag] = { units: { ...gaap[tag].units, shares: shares.map(inScale) } };
+  }
+  return corrected;
 }
 
 // Basic first. Only a split changes a past period's basic count, while an accounting
@@ -475,9 +553,10 @@ function quarterValues(series: Series, calendar: FiscalPeriod[], additive: boole
 
 /** One period's statements from a company's facts, or null if it has none on 10-Ks and 10-Qs. */
 export function toFinancials(facts: CompanyFacts, period: FinancialPeriod): Statements | null {
-  const gaap = facts.facts["us-gaap"];
-  if (!gaap) return null;
+  const filed = facts.facts["us-gaap"];
+  if (!filed) return null;
 
+  const gaap = inWholeShares(filed);
   const calendar = fiscalCalendar(gaap);
   const annual = period === "annual";
   const hasQuarters = calendar.some(({ quarter }) => quarter < 4);
@@ -485,7 +564,8 @@ export function toFinancials(facts: CompanyFacts, period: FinancialPeriod): Stat
   if (available.length === 0) return null;
 
   const shown = available.slice(annual ? -ANNUAL_PERIODS : -QUARTERLY_PERIODS).reverse();
-  const splits = stockSplits(gaap);
+  // Counts as filed: once put right, a merger that recast a company's history can pass for a split.
+  const splits = stockSplits(filed);
 
   // Per-share figures and share counts don't add up across quarters, so they're never worked out from totals.
   const flowLine = (spec: LineSpec): StatementLine => {

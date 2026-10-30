@@ -75,6 +75,10 @@ describe("keyStats", () => {
     ]);
   });
 
+  it("treats a gross margin of zero as missing: Yahoo sends that for banks, which don't have one", () => {
+    expect(values({ ...MSFT, grossMargin: 0 })["Gross margin"]).toBeUndefined();
+  });
+
   it("leaves a stock's missing stats empty instead of dropping them", () => {
     const young: Profile = { symbol: "NEW", name: "New Co", type: "EQUITY", marketCap: 1e9 };
     const stats = keyStats(young);

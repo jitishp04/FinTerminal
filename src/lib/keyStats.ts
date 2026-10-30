@@ -42,7 +42,7 @@ export function keyStats(p: Profile): Stat[] {
       ["52-week range", range],
       volume,
       ["Shares out", as(p.sharesOutstanding, formatCompact)],
-      ["Gross margin", as(p.grossMargin, formatFraction)],
+      ["Gross margin", as(p.grossMargin || undefined, formatFraction)],
       ["Operating margin", as(p.operatingMargin, formatFraction)],
       ["Profit margin", as(p.profitMargin, formatFraction)],
     ];

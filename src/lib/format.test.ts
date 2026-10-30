@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatChange, formatCompact, formatFraction, formatInteger, formatPercent, formatPrice } from "./format";
+import {
+  formatChange,
+  formatCompact,
+  formatFraction,
+  formatInteger,
+  formatPercent,
+  formatPrice,
+  formatUpdated,
+} from "./format";
 
 describe("formatPrice", () => {
   it("uses two decimals, four under 10", () => {
@@ -53,5 +61,18 @@ describe("formatCompact", () => {
 describe("formatInteger", () => {
   it("groups thousands", () => {
     expect(formatInteger(228000)).toBe("228,000");
+  });
+});
+
+describe("formatUpdated", () => {
+  const seconds = (date: Date) => date.getTime() / 1000;
+  const now = new Date(2026, 9, 30, 18, 0);
+
+  it("shows the local time for an update today", () => {
+    expect(formatUpdated(seconds(new Date(2026, 9, 30, 9, 5)), now)).toBe("09:05");
+  });
+
+  it("shows the date for an update on an earlier day", () => {
+    expect(formatUpdated(seconds(new Date(2026, 9, 29, 23, 50)), now)).toBe("Oct 29");
   });
 });

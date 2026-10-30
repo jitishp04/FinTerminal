@@ -45,3 +45,12 @@ const whole = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 export function formatInteger(value: number): string {
   return whole.format(value);
 }
+
+const clock = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/** When a quote last moved, from epoch seconds, in local time: `17:35` today, otherwise `Oct 29`. */
+export function formatUpdated(time: number, now: Date): string {
+  const updated = new Date(time * 1000);
+  return (updated.toDateString() === now.toDateString() ? clock : shortDate).format(updated);
+}

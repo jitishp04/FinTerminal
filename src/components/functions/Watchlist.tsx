@@ -1,14 +1,11 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { Command } from "@/lib/commands";
-import { fetchApi } from "@/lib/fetchApi";
-import { formatChange, formatCompact, formatPercent, formatPrice, priceDecimals } from "@/lib/format";
+import { formatCompact, formatPrice, priceDecimals } from "@/lib/format";
 import type { Quote } from "@/lib/types";
 import { addSymbol, parseWatchlist, removeSymbol, watchlistStore } from "@/lib/watchlist";
-
-const REFRESH = 10_000;
+import { QUOTE_TABLE, QuoteCells, QuotesError, useQuotes } from "./quotes";
 
 /** Your symbols, refreshed by one batched request. W panels share the list and the request. */
 export function Watchlist({ onOpen }: { onOpen: (command: Command) => void }) {
@@ -16,20 +13,7 @@ export function Watchlist({ onOpen }: { onOpen: (command: Command) => void }) {
   const symbols = useMemo(() => parseWatchlist(raw), [raw]);
   const [draft, setDraft] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
-
-  const { data, error, isPlaceholderData } = useQuery({
-    queryKey: ["quotes", symbols],
-    queryFn: async () =>
-      (await fetchApi<{ quotes: Quote[] }>(`/api/quote?symbols=${symbols.map(encodeURIComponent).join(",")}`)).quotes,
-    enabled: symbols.length > 0,
-    refetchInterval: REFRESH,
-    // Fresh until the next poll, so switching windows doesn't refetch it.
-    staleTime: REFRESH,
-    // Keeps the rows on screen while a changed list loads.
-    placeholderData: keepPreviousData,
-  });
-  const quotes = useMemo(() => new Map(data?.map((q) => [q.symbol, q])), [data]);
-  const loading = isPlaceholderData || (data === undefined && !error);
+  const { quotes, error, hasData, loading } = useQuotes(symbols);
 
   const save = (next: string[]) => watchlistStore.save(JSON.stringify(next));
 
@@ -76,18 +60,14 @@ export function Watchlist({ onOpen }: { onOpen: (command: Command) => void }) {
         )}
       </form>
 
-      {error && (
-        <p role="alert" className="text-down">
-          {data ? `Prices may be out of date. ${error.message}` : error.message}
-        </p>
-      )}
+      <QuotesError error={error} hasData={hasData} />
 
       {symbols.length === 0 ? (
         <p role="status" className="text-muted">
           Your watchlist is empty. Add a symbol above.
         </p>
       ) : (
-        <table className="w-full text-right whitespace-nowrap [&_td]:px-1 [&_td]:py-0.5 [&_th]:px-1 [&_th]:py-0.5 [&_th]:font-normal">
+        <table className={QUOTE_TABLE}>
           <thead className="text-xs text-muted">
             <tr className="border-b border-border">
               <th scope="col" className="text-left">
@@ -134,8 +114,6 @@ interface RowProps {
 }
 
 function Row({ symbol, quote, loading, onOpen, onRemove }: RowProps) {
-  const change = quote?.change ?? 0;
-  const tone = change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted";
   return (
     <tr onClick={onOpen} className="cursor-pointer hover:bg-border">
       <td className="text-left">
@@ -148,13 +126,7 @@ function Row({ symbol, quote, loading, onOpen, onRemove }: RowProps) {
           {symbol}
         </button>
       </td>
-      <td>{quote ? <LastPrice price={quote.price} /> : <span className="text-muted">{loading ? "…" : "No data"}</span>}</td>
-      <td className={tone}>
-        {quote?.change === undefined
-          ? "—"
-          : `${change > 0 ? "▲ " : change < 0 ? "▼ " : ""}${formatChange(change, priceDecimals(quote.price))}`}
-      </td>
-      <td className={tone}>{quote?.changePercent === undefined ? "—" : formatPercent(quote.changePercent)}</td>
+      <QuoteCells quote={quote} loading={loading} missing="No data" />
       <td className="hidden @md:table-cell">{quote?.volume ? formatCompact(quote.volume) : "—"}</td>
       <td className="hidden @lg:table-cell">{dayRange(quote)}</td>
       <td className="w-px">
@@ -172,20 +144,6 @@ function Row({ symbol, quote, loading, onOpen, onRemove }: RowProps) {
         </button>
       </td>
     </tr>
-  );
-}
-
-/** Flashes green or red when the price changes. */
-function LastPrice({ price }: { price: number }) {
-  const [seen, setSeen] = useState({ price, flash: "" });
-  if (price !== seen.price) {
-    setSeen({ price, flash: price > seen.price ? "animate-flash-up" : "animate-flash-down" });
-  }
-  // The key restarts the animation on every change.
-  return (
-    <span key={price} className={`rounded-sm px-0.5 ${seen.flash}`}>
-      {formatPrice(price)}
-    </span>
   );
 }
 

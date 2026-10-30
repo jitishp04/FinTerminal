@@ -81,6 +81,20 @@ describe("quote", () => {
     expect(yahoo.quote).toHaveBeenCalledTimes(1);
     expect(yahoo.quote).toHaveBeenCalledWith(["AAPL"]);
   });
+
+  it("answers every 10-second watchlist poll with fresh data", async () => {
+    vi.useFakeTimers();
+    // The TTL starts when Yahoo answers, so the delay is what could push a poll inside it.
+    yahoo.quote.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve([AAPL]), 300)));
+
+    for (let poll = 0; poll < 3; poll++) {
+      void quote(["AAPL"]);
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+
+    vi.useRealTimers();
+    expect(yahoo.quote).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("chart", () => {

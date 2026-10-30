@@ -1,5 +1,7 @@
 // What the API routes return, whatever the source. Times are epoch seconds (UTC).
 
+export const MAX_QUOTE_SYMBOLS = 50;
+
 export interface Quote {
   symbol: string;
   name: string;

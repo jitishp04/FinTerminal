@@ -13,7 +13,8 @@ const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const DAY = 24 * 60 * MINUTE;
 
-const QUOTE_TTL = 10 * SECOND;
+// Under the watchlist's 10 s poll: the TTL starts when Yahoo answers, so at 10 s every other poll would be a cache hit.
+const QUOTE_TTL = 8 * SECOND;
 const PROFILE_TTL = 60 * MINUTE;
 
 const daysAgo = (days: number) => (now: Date) => new Date(now.getTime() - days * DAY);

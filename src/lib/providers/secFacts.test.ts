@@ -35,6 +35,65 @@ const company = (tag: string, rows: [string | undefined, string, number, string,
   return { entityName: "Test Co", facts: { "us-gaap": { [tag]: { units: { USD: facts } } } } };
 };
 
+const COLUMN_TAGS = {
+  basic: ["WeightedAverageNumberOfSharesOutstandingBasic", "shares"],
+  diluted: ["WeightedAverageNumberOfDilutedSharesOutstanding", "shares"],
+  basicAndDiluted: ["WeightedAverageNumberOfShareOutstandingBasicAndDiluted", "shares"],
+  epsBasic: ["EarningsPerShareBasic", "USD/shares"],
+  epsDiluted: ["EarningsPerShareDiluted", "USD/shares"],
+  epsBasicAndDiluted: ["EarningsPerShareBasicAndDiluted", "USD/shares"],
+  netIncome: ["NetIncomeLoss", "USD"],
+} as const;
+
+/** A year, or one of its first three quarters. Whatever a column leaves out isn't tagged. */
+type Column = { year: number; quarter?: 1 | 2 | 3 } & Partial<Record<keyof typeof COLUMN_TAGS, number>>;
+
+const QUARTER_MONTHS = { 1: ["01", "03"], 2: ["04", "06"], 3: ["07", "09"] };
+
+/** A company from `{ filed: columns }`, where a filing's own period is its latest column. */
+const filings = (reports: Record<string, Column[]>) => {
+  const gaap: Record<string, { units: Record<string, Fact[]> }> = {};
+  for (const [filed, columns] of Object.entries(reports)) {
+    const fy = Math.max(...columns.map(({ year }) => year));
+    for (const { year, quarter, ...values } of columns) {
+      const [first, last] = quarter ? QUARTER_MONTHS[quarter] : ["01", "12"];
+      const period = {
+        start: `${year}-${first}-01`,
+        end: `${year}-${last}-28`,
+        accn: filed,
+        fy,
+        fp: quarter ? `Q${quarter}` : "FY",
+        form: quarter ? "10-Q" : "10-K",
+        filed,
+      };
+      for (const [field, val] of Object.entries(values)) {
+        const [tag, unit] = COLUMN_TAGS[field as keyof typeof COLUMN_TAGS];
+        gaap[tag] ??= { units: { [unit]: [] } };
+        gaap[tag].units[unit].push({ ...period, val });
+      }
+    }
+  }
+  return { entityName: "Test Co", facts: { "us-gaap": gaap } };
+};
+
+/** A year with no dilution, whose net income is what its shares and EPS multiply to. */
+const plainYear = (year: number, shares: number, eps: number): Column => ({
+  year,
+  basic: shares,
+  diluted: shares,
+  epsBasic: eps,
+  epsDiluted: eps,
+  netIncome: shares * eps,
+});
+
+const perShare = (facts: unknown, year: number) => {
+  const annual = statements(facts, "annual");
+  return {
+    eps: value(annual, "income", "epsDiluted", `FY${year}`),
+    shares: value(annual, "income", "sharesDiluted", `FY${year}`),
+  };
+};
+
 describe("annual statements", () => {
   const annual = statements(aapl, "annual");
 
@@ -213,6 +272,291 @@ describe("which number wins", () => {
     ]);
     const result = statements(facts, "quarterly");
     expect(result.periods).toEqual([{ end: "2026-06-30", label: "Q2 FY2026" }]);
+  });
+});
+
+describe("stock splits", () => {
+  describe("NVIDIA, which split 4-for-1 in 2021 and 10-for-1 in 2024", () => {
+    const annual = statements(nvda, "annual");
+
+    it("restates a year no filing after the split reported", () => {
+      expect(value(annual, "income", "epsDiluted", "FY2022")).toBeCloseTo(0.385, 6);
+      expect(value(annual, "income", "sharesDiluted", "FY2022")).toBe(25_350_000_000);
+    });
+
+    it("applies only the splits after a year's latest filing", () => {
+      expect(value(annual, "income", "epsDiluted", "FY2021")).toBeCloseTo(0.173, 6);
+      expect(value(annual, "income", "sharesDiluted", "FY2021")).toBe(25_100_000_000);
+    });
+
+    it("leaves years the company already restated", () => {
+      expect(value(annual, "income", "epsDiluted", "FY2023")).toBe(0.17);
+      expect(value(annual, "income", "sharesDiluted", "FY2023")).toBe(25_070_000_000);
+      expect(value(annual, "income", "epsDiluted", "FY2026")).toBe(4.9);
+      expect(value(annual, "income", "sharesDiluted", "FY2026")).toBe(24_514_000_000);
+    });
+
+    it("leaves a quarter first filed before the split once a later filing restates it", () => {
+      expect(value(statements(nvda, "quarterly"), "income", "epsDiluted", "Q1 FY2025")).toBe(0.6);
+    });
+
+    it("doesn't touch dollar lines", () => {
+      expect(value(annual, "income", "netIncome", "FY2022")).toBe(9_752_000_000);
+      expect(value(annual, "income", "netIncome", "FY2021")).toBe(4_332_000_000);
+    });
+  });
+
+  it("restates quarters the same way", () => {
+    const facts = filings({
+      "2023-05-01": [{ ...plainYear(2023, 100, 5), quarter: 1 }],
+      "2023-08-01": [{ ...plainYear(2023, 100, 6), quarter: 2 }],
+      "2024-05-01": [{ ...plainYear(2023, 200, 2.5), quarter: 1 }, { ...plainYear(2024, 200, 3), quarter: 1 }],
+    });
+    const quarterly = statements(facts, "quarterly");
+    expect(value(quarterly, "income", "epsDiluted", "Q2 FY2023")).toBe(3);
+    expect(value(quarterly, "income", "sharesDiluted", "Q2 FY2023")).toBe(200);
+    expect(value(quarterly, "income", "epsDiluted", "Q1 FY2023")).toBe(2.5);
+  });
+
+  it("handles a split that isn't a whole number, like 3-for-2", () => {
+    const facts = filings({
+      "2022-02-01": [plainYear(2020, 300, 1.5), plainYear(2021, 300, 3)],
+      "2023-02-01": [plainYear(2021, 300, 3), plainYear(2022, 300, 4)],
+      "2024-02-01": [plainYear(2022, 450, 2.67), plainYear(2023, 450, 3)],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 2, shares: 450 });
+    expect(perShare(facts, 2022)).toEqual({ eps: 2.67, shares: 450 });
+    expect(perShare(facts, 2023)).toEqual({ eps: 3, shares: 450 });
+  });
+
+  it("handles a reverse split, as at GE in 2021", () => {
+    const facts = filings({
+      "2020-02-01": [plainYear(2018, 8000, 0.75), plainYear(2019, 8000, 0.25)],
+      "2021-02-01": [plainYear(2019, 8000, 0.25), plainYear(2020, 8000, 0.5)],
+      "2022-02-01": [plainYear(2020, 1000, 4), plainYear(2021, 1000, 6)],
+    });
+    expect(perShare(facts, 2019)).toEqual({ eps: 2, shares: 1000 });
+    expect(perShare(facts, 2020)).toEqual({ eps: 4, shares: 1000 });
+  });
+
+  it("leaves a merger's jump in shares alone, even at a split-like ratio", () => {
+    const facts = filings({
+      "2022-02-01": [plainYear(2020, 100, 4), plainYear(2021, 100, 5)],
+      "2023-02-01": [plainYear(2021, 100, 5), plainYear(2022, 100, 6)],
+      "2024-02-01": [plainYear(2022, 100, 6), plainYear(2023, 150, 5)],
+      "2025-02-01": [plainYear(2023, 150, 5), plainYear(2024, 150, 6)],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 5, shares: 100 });
+    expect(perShare(facts, 2022)).toEqual({ eps: 6, shares: 100 });
+    expect(perShare(facts, 2023)).toEqual({ eps: 5, shares: 150 });
+  });
+
+  it("doesn't mistake a filing's share count in the wrong scale for a split, as at ConocoPhillips", () => {
+    const earlier = (shares: Column) => ({
+      "2022-02-01": [{ ...shares, year: 2021 }],
+      "2023-02-01": [{ ...shares, year: 2021 }, { ...shares, year: 2022 }],
+    });
+    const wrongScale = { basic: 1_000_000_000, diluted: 1_000_000_000 };
+
+    const withEps = plainYear(0, 1_000_000, 5);
+    const taggingEps = filings({
+      ...earlier(withEps),
+      "2024-02-01": [{ ...withEps, ...wrongScale, year: 2022 }, { ...withEps, year: 2023 }],
+    });
+    expect(perShare(taggingEps, 2021).shares).toBe(1_000_000);
+
+    const countsOnly = { year: 0, basic: 1_000_000, diluted: 1_000_000 };
+    const notTaggingEps = filings({
+      ...earlier(countsOnly),
+      "2024-02-01": [{ ...wrongScale, year: 2022 }, { ...countsOnly, year: 2023 }],
+    });
+    expect(perShare(notTaggingEps, 2021).shares).toBe(1_000_000);
+  });
+
+  it("doesn't take a split's size from counts that were in the wrong scale, as at Agenus", () => {
+    // A 1-for-20: the old counts are in thousands, which makes it look like 50-for-1. Only EPS shows which way it went.
+    const inThousands = (year: number, eps: number): Column => ({
+      year,
+      basic: 400_000,
+      diluted: 400_000,
+      epsBasic: eps,
+      epsDiluted: eps,
+    });
+    const facts = filings({
+      "2022-02-01": [inThousands(2021, 2)],
+      "2023-02-01": [inThousands(2021, 2), inThousands(2022, 1)],
+      "2024-02-01": [plainYear(2022, 20_000_000, 20), plainYear(2023, 20_000_000, 15)],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 2, shares: 400_000 });
+
+    // A small EPS can't show a split, but it can still rule one out.
+    const smallEps = filings({
+      "2022-02-01": [inThousands(2021, 0.2)],
+      "2023-02-01": [inThousands(2021, 0.2), inThousands(2022, 0.2)],
+      "2024-02-01": [plainYear(2022, 20_000_000, 4), plainYear(2023, 20_000_000, 3)],
+    });
+    expect(perShare(smallEps, 2021)).toEqual({ eps: 0.2, shares: 400_000 });
+  });
+
+  it("doesn't read a split into a reverse merger's history in the wrong scale, as at EchoStar", () => {
+    const facts = filings({
+      "2022-02-01": [plainYear(2021, 90_000_000, 2)],
+      "2023-02-01": [plainYear(2021, 90_000_000, 2), plainYear(2022, 90_000_000, 0.1)],
+      "2024-02-01": [
+        { year: 2022, basic: 290_000, diluted: 290_000, epsBasic: -0.5, epsDiluted: -0.5, netIncome: -145_000_000 },
+        plainYear(2023, 290_000_000, 1),
+      ],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 2, shares: 90_000_000 });
+  });
+
+  it("doesn't mistake an accounting change to diluted shares for a split, as at AT&T", () => {
+    const facts = filings({
+      "2022-02-01": [{ year: 2021, basic: 100, diluted: 120, epsBasic: 5, epsDiluted: 4.2, netIncome: 500 }],
+      "2023-02-01": [
+        { year: 2021, basic: 100, diluted: 120, epsBasic: 5, epsDiluted: 4.2, netIncome: 500 },
+        { year: 2022, basic: 100, diluted: 120, epsBasic: 6, epsDiluted: 5, netIncome: 600 },
+      ],
+      "2024-02-01": [
+        { year: 2022, basic: 100, diluted: 150, epsBasic: 6, epsDiluted: 4, netIncome: 600 },
+        { year: 2023, basic: 100, diluted: 150, epsBasic: 7, epsDiluted: 4.67, netIncome: 700 },
+      ],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 4.2, shares: 120 });
+  });
+
+  it("doesn't read a split into EPS in the wrong scale, from a table with no share counts, as at Brown & Brown", () => {
+    const facts = filings({
+      "2022-02-01": [plainYear(2021, 100, 4)],
+      "2023-02-01": [plainYear(2021, 100, 4), plainYear(2022, 100, 5)],
+      "2024-02-01": [
+        { year: 2022, epsBasic: 0.05, epsDiluted: 0.05, netIncome: 500 },
+        plainYear(2023, 100, 6),
+      ],
+    });
+    expect(perShare(facts, 2021)).toEqual({ eps: 4, shares: 100 });
+  });
+
+  it("doesn't read a split into EPS that a merger's accounting replaced, as at EchoStar", () => {
+    const facts = filings({
+      "2022-02-01": [{ year: 2021, epsBasic: 2, epsDiluted: 2, netIncome: 200 }],
+      "2023-02-01": [
+        { year: 2021, epsBasic: 2, epsDiluted: 2, netIncome: 200 },
+        { year: 2022, epsBasic: 1, epsDiluted: 1, netIncome: 100 },
+      ],
+      "2024-02-01": [
+        { year: 2022, epsBasic: 3, epsDiluted: 3, netIncome: 1500 },
+        { year: 2023, epsBasic: 4, epsDiluted: 4, netIncome: 2000 },
+      ],
+    });
+    expect(perShare(facts, 2021).eps).toBe(2);
+  });
+
+  it("doesn't read a split into a cent's rounding on a tiny EPS, as at Intuit", () => {
+    const facts = filings({
+      "2022-02-01": [{ year: 2021, epsBasic: 0.02, epsDiluted: 0.02, netIncome: 200 }],
+      "2023-02-01": [
+        { year: 2021, epsBasic: 0.02, epsDiluted: 0.02, netIncome: 200 },
+        { year: 2022, epsBasic: 0.02, epsDiluted: 0.02, netIncome: 200 },
+      ],
+      "2024-02-01": [
+        { year: 2022, epsBasic: 0.01, epsDiluted: 0.01, netIncome: 200 },
+        { year: 2023, epsBasic: 0.01, epsDiluted: 0.01, netIncome: 100 },
+      ],
+    });
+    expect(perShare(facts, 2021).eps).toBe(0.02);
+  });
+
+  it("doesn't read a split into EPS restated for other reasons, with no share counts to go on, as at Targa", () => {
+    const facts = filings({
+      "2022-02-01": [{ year: 2021, epsBasic: 6, epsDiluted: 6, netIncome: 600 }],
+      "2023-02-01": [
+        { year: 2021, epsBasic: 6, epsDiluted: 6, netIncome: 600 },
+        { year: 2022, epsBasic: 6, epsDiluted: 6, netIncome: 600 },
+      ],
+      "2024-02-01": [
+        { year: 2022, epsBasic: 5, epsDiluted: 5, netIncome: 600 },
+        { year: 2023, epsBasic: 5, epsDiluted: 5, netIncome: 600 },
+      ],
+    });
+    expect(perShare(facts, 2021).eps).toBe(6);
+  });
+
+  it("sees past a 10-K table with no share counts to the filing that restated them, as at Amphenol", () => {
+    const facts = filings({
+      "2020-02-01": [plainYear(2019, 100, 3)],
+      "2021-02-01": [plainYear(2020, 100, 4)],
+      "2021-03-01": [{ year: 2020, epsBasic: 4, epsDiluted: 4, netIncome: 400 }],
+      "2022-02-01": [plainYear(2020, 200, 2), plainYear(2021, 200, 3)],
+    });
+    expect(perShare(facts, 2019)).toEqual({ eps: 1.5, shares: 200 });
+  });
+
+  it("counts two splits once each when a year's restatement spans both, as at Copart", () => {
+    const facts = filings({
+      "2019-02-01": [plainYear(2018, 100, 12)],
+      "2020-02-01": [plainYear(2019, 100, 8)],
+      "2021-02-01": [plainYear(2020, 100, 4)],
+      "2022-02-01": [plainYear(2019, 200, 4), plainYear(2021, 200, 3)],
+      "2023-02-01": [plainYear(2020, 400, 1), plainYear(2021, 400, 1.5), plainYear(2022, 400, 2)],
+    });
+    expect(perShare(facts, 2018)).toEqual({ eps: 3, shares: 400 });
+    expect(perShare(facts, 2019)).toEqual({ eps: 2, shares: 400 });
+    expect(perShare(facts, 2020)).toEqual({ eps: 1, shares: 400 });
+  });
+
+  it("finds a split from EPS and net income when no share count is tagged, as at Alphabet", () => {
+    const facts = filings({
+      "2021-02-01": [{ year: 2020, epsBasic: 41, epsDiluted: 40, netIncome: 40_000 }],
+      "2022-02-01": [
+        { year: 2020, epsBasic: 41, epsDiluted: 40, netIncome: 40_000 },
+        { year: 2021, epsBasic: 61, epsDiluted: 60, netIncome: 60_000 },
+      ],
+      "2023-02-01": [
+        { year: 2021, epsBasic: 3.05, epsDiluted: 3, netIncome: 60_000 },
+        { year: 2022, epsBasic: 2.55, epsDiluted: 2.5, netIncome: 50_000 },
+      ],
+    });
+    expect(perShare(facts, 2020).eps).toBe(2);
+  });
+
+  it("finds a split from basic and diluted counts when EPS isn't tagged, as at Monster", () => {
+    const facts = filings({
+      "2022-02-01": [{ year: 2021, basic: 1000, diluted: 1010 }],
+      "2023-02-01": [{ year: 2021, basic: 1000, diluted: 1010 }, { year: 2022, basic: 1000, diluted: 1010 }],
+      "2024-02-01": [{ year: 2022, basic: 2000, diluted: 2020 }, { year: 2023, basic: 2000, diluted: 2020 }],
+    });
+    expect(perShare(facts, 2021).shares).toBe(2020);
+  });
+
+  it("goes by the basic count when the same filing also restates income and dilution, as at DexCom", () => {
+    const facts = filings({
+      "2021-02-01": [{ year: 2020, basic: 100, diluted: 104, epsBasic: 3, epsDiluted: 2.88, netIncome: 300 }],
+      "2022-02-01": [
+        { year: 2020, basic: 100, diluted: 104, epsBasic: 3, epsDiluted: 2.88, netIncome: 300 },
+        { year: 2021, basic: 100, diluted: 104, epsBasic: 5, epsDiluted: 4.81, netIncome: 500 },
+      ],
+      "2023-02-01": [
+        { year: 2021, basic: 400, diluted: 430, epsBasic: 1.55, epsDiluted: 1.44, netIncome: 620 },
+        { year: 2022, basic: 400, diluted: 430, epsBasic: 2, epsDiluted: 1.86, netIncome: 800 },
+      ],
+    });
+    expect(perShare(facts, 2020)).toEqual({ eps: 0.72, shares: 416 });
+  });
+
+  it("follows a period across a change of tags, as at Palo Alto Networks", () => {
+    const facts = filings({
+      "2021-02-01": [{ year: 2020, basicAndDiluted: 100, epsBasicAndDiluted: -1.5, netIncome: -150 }],
+      "2022-02-01": [
+        { year: 2020, basicAndDiluted: 100, epsBasicAndDiluted: -1.5, netIncome: -150 },
+        { year: 2021, basicAndDiluted: 100, epsBasicAndDiluted: -2, netIncome: -200 },
+      ],
+      "2023-02-01": [
+        { year: 2021, basic: 300, diluted: 300, epsBasic: -0.67, epsDiluted: -0.67, netIncome: -200 },
+        plainYear(2022, 300, 1),
+      ],
+    });
+    expect(perShare(facts, 2020)).toEqual({ eps: -0.5, shares: 300 });
   });
 });
 

@@ -39,6 +39,53 @@ export type ChartRange = (typeof CHART_RANGES)[number];
 export const MOVER_TYPES = ["gainers", "losers", "actives"] as const;
 export type MoverType = (typeof MOVER_TYPES)[number];
 
+export const FINANCIAL_PERIODS = ["annual", "quarterly"] as const;
+export type FinancialPeriod = (typeof FINANCIAL_PERIODS)[number];
+
+export interface StatementPeriod {
+  /** Date the period ended, e.g. "2025-09-27". */
+  end: string;
+  /** The company's own fiscal naming, e.g. "FY2025" or "Q3 FY2026". */
+  label: string;
+}
+
+export interface StatementLine {
+  key: string;
+  label: string;
+  /** Dollars unless set. */
+  unit?: "perShare" | "shares";
+  /** One per period, in the same order. Null where the company didn't report it. */
+  values: (number | null)[];
+}
+
+export interface Financials {
+  symbol: string;
+  name: string;
+  period: FinancialPeriod;
+  /** Newest first. */
+  periods: StatementPeriod[];
+  income: StatementLine[];
+  balance: StatementLine[];
+  cashFlow: StatementLine[];
+}
+
+export interface Filing {
+  form: string;
+  /** Date filed, e.g. "2025-10-31". */
+  filed: string;
+  /** Date the filing covers, if it has one. */
+  reportDate: string | null;
+  description: string;
+  url: string;
+}
+
+export interface Filings {
+  symbol: string;
+  name: string;
+  /** Newest first. */
+  filings: Filing[];
+}
+
 export interface Chart {
   symbol: string;
   range: ChartRange;

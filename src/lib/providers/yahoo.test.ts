@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import { clearCache } from "../cache";
-import { chart, profile, quote, sessionStart } from "./yahoo";
+import { chart, movers, profile, quote, sessionStart } from "./yahoo";
 
-const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn() }));
+const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn() }));
 
 vi.mock("yahoo-finance2", () => ({
   default: class {
     quote = yahoo.quote;
     chart = yahoo.chart;
     quoteSummary = yahoo.quoteSummary;
+    screener = yahoo.screener;
   },
 }));
 
@@ -110,6 +111,63 @@ describe("quote", () => {
 
     vi.useRealTimers();
     expect(yahoo.quote).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("movers", () => {
+  // Trimmed from a live response on 30 Oct 2026. Unlike quote(), the time is in epoch seconds.
+  const row = (symbol: string, changePercent: number, volume = 100) => ({
+    ...AAPL,
+    symbol,
+    regularMarketChangePercent: changePercent,
+    regularMarketVolume: volume,
+    regularMarketTime: 1793385490,
+  });
+
+  it("asks Yahoo for the matching list without validating it", async () => {
+    yahoo.screener.mockResolvedValue({ quotes: [] });
+
+    await movers("actives");
+
+    expect(yahoo.screener).toHaveBeenCalledWith({ scrIds: "most_actives", count: 25 }, undefined, {
+      validateResult: false,
+    });
+  });
+
+  it("normalizes rows like quotes, reading the time as epoch seconds", async () => {
+    yahoo.screener.mockResolvedValue({ quotes: [row("CDNA", 19.44)] });
+
+    const [first] = await movers("gainers");
+
+    expect(first).toMatchObject({ symbol: "CDNA", name: "Apple Inc.", price: 344.46, time: 1793385490 });
+  });
+
+  it("leaves out a row without a price instead of failing the list", async () => {
+    yahoo.screener.mockResolvedValue({ quotes: [row("CDNA", 19.44), { symbol: "BAD", quoteType: "EQUITY" }] });
+
+    expect((await movers("gainers")).map((q) => q.symbol)).toEqual(["CDNA"]);
+  });
+
+  it("ranks each list itself, since Yahoo's order isn't strict", async () => {
+    yahoo.screener.mockResolvedValue({ quotes: [row("A", 15, 10), row("B", 19, 30), row("C", -2, 20)] });
+
+    expect((await movers("gainers")).map((q) => q.symbol)).toEqual(["B", "A", "C"]);
+    expect((await movers("losers")).map((q) => q.symbol)).toEqual(["C", "A", "B"]);
+    expect((await movers("actives")).map((q) => q.symbol)).toEqual(["B", "C", "A"]);
+  });
+
+  it("answers every 60-second poll with fresh data", async () => {
+    vi.useFakeTimers();
+    // The TTL starts when Yahoo answers, so the delay is what could push a poll inside it.
+    yahoo.screener.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ quotes: [] }), 300)));
+
+    for (let poll = 0; poll < 3; poll++) {
+      void movers("gainers");
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+
+    vi.useRealTimers();
+    expect(yahoo.screener).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -36,6 +36,9 @@ export interface Bar {
 export const CHART_RANGES = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
 export type ChartRange = (typeof CHART_RANGES)[number];
 
+export const MOVER_TYPES = ["gainers", "losers", "actives"] as const;
+export type MoverType = (typeof MOVER_TYPES)[number];
+
 export interface Chart {
   symbol: string;
   range: ChartRange;

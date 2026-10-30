@@ -132,7 +132,7 @@ function Statement({ financials, tab }: { financials: Financials; tab: Statement
         </table>
       </div>
       <p className="text-xs text-muted">
-        From SEC filings. Per-share figures are in dollars, not adjusted for later stock splits.
+        From SEC filings. Per-share figures are in dollars.
         {financials.period === "quarterly" &&
           " Q4 and quarterly cash flow are worked out from year-to-date totals."}
       </p>

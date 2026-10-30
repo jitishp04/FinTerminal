@@ -196,6 +196,34 @@ const LENGTH_TOLERANCE_DAYS = 25;
 
 const FISCAL_QUARTERS: Record<string, number> = { Q1: 1, Q2: 2, Q3: 3, FY: 4 };
 
+/** What a filing reports about the shares behind a period's per-share figures. A combined tag serves as either kind. */
+const SHARE_BASIS = {
+  basicShares: {
+    tags: ["WeightedAverageNumberOfSharesOutstandingBasic", "WeightedAverageNumberOfShareOutstandingBasicAndDiluted"],
+    units: "shares",
+  },
+  dilutedShares: {
+    tags: ["WeightedAverageNumberOfDilutedSharesOutstanding", "WeightedAverageNumberOfShareOutstandingBasicAndDiluted"],
+    units: "shares",
+  },
+  basicEps: { tags: ["EarningsPerShareBasic", "EarningsPerShareBasicAndDiluted"], units: "USD/shares" },
+  dilutedEps: { tags: ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"], units: "USD/shares" },
+  netIncome: { tags: ["NetIncomeLoss", "ProfitLoss"], units: "USD" },
+};
+
+/** Share counts and EPS are rounded, so restated figures land near a split's ratio, not on it. */
+const SPLIT_TOLERANCE = 0.02;
+// Stock dividends of a few percent stay as filed: they look too much like an accounting change.
+const SMALLEST_SPLIT = 1.15;
+// Filings sometimes tag a share count in thousands or millions by mistake, and that's a factor of 1,000 or more.
+const LARGEST_SPLIT = 500;
+const LARGEST_SPLIT_DENOMINATOR = 5;
+const EPS_ROUNDING = 0.005;
+// Below this, that rounding moves EPS by more than the tolerance.
+const SMALLEST_TELLING_EPS = 0.25;
+// EPS can be restated by less than this for other reasons, while income stays the same.
+const SMALLEST_SPLIT_FROM_EPS_ALONE = 2;
+
 type Gaap = NonNullable<CompanyFacts["facts"]["us-gaap"]>;
 /** A line's reported values by `end/quarters`, where 0 quarters is a point in time. */
 type Series = Map<string, number>;
@@ -205,6 +233,21 @@ interface FiscalPeriod {
   fiscalYear: number;
   /** 4 for the full year, which also ends Q4. */
   quarter: number;
+}
+
+type ShareBasis = Partial<Record<keyof typeof SHARE_BASIS, number>> & { filed: string };
+
+/** Two filings of a period, and how far its share count moved between them by each measure, as new over old. */
+interface Restatement {
+  older: ShareBasis;
+  newer: ShareBasis;
+  ratios: number[];
+}
+
+/** `factor` new shares for each old one, from the first filing on the new basis. */
+interface StockSplit {
+  filed: string;
+  factor: number;
 }
 
 export type Statements = Omit<Financials, "symbol">;
@@ -224,8 +267,138 @@ function quartersSpanned(fact: Fact): number | undefined {
   return quarters >= 1 && quarters <= 4 && regular ? quarters : undefined;
 }
 
+const nearSplit = (ratio: number, factor: number) => Math.abs(ratio / factor - 1) <= SPLIT_TOLERANCE;
+
+/** The ratio a split would give for a change in shares, like 3/2 or 1/8, or undefined if it isn't one. */
+function splitFactor(ratio: number): number | undefined {
+  const size = Math.max(ratio, 1 / ratio);
+  if (size < SMALLEST_SPLIT || size > LARGEST_SPLIT) return undefined;
+  for (let denominator = 1; denominator <= LARGEST_SPLIT_DENOMINATOR; denominator++) {
+    const simple = Math.round(size * denominator) / denominator;
+    if (nearSplit(size, simple)) return ratio > 1 ? simple : 1 / simple;
+  }
+  return undefined;
+}
+
+/** Each period's filings, oldest first, with what each reports about its shares. */
+function filedShareBases(gaap: Gaap): ShareBasis[][] {
+  const periods = new Map<string, Map<string, ShareBasis>>();
+  for (const [field, { tags, units }] of Object.entries(SHARE_BASIS)) {
+    for (const tag of tags) {
+      for (const fact of gaap[tag]?.units[units] ?? []) {
+        const quarters = quartersSpanned(fact);
+        if (!quarters || !isPeriodicReport(fact)) continue;
+        const key = seriesKey(fact.end, quarters);
+        const filings = periods.get(key) ?? new Map<string, ShareBasis>();
+        const basis = filings.get(fact.accn) ?? { filed: fact.filed };
+        basis[field as keyof typeof SHARE_BASIS] ??= fact.val;
+        periods.set(key, filings.set(fact.accn, basis));
+      }
+    }
+  }
+  return [...periods.values()].map((filings) =>
+    [...filings.values()].sort((a, b) => a.filed.localeCompare(b.filed)),
+  );
+}
+
+// Basic first. Only a split changes a past period's basic count, while an accounting
+// change can move diluted shares.
+const reportedCounts = ({ basicShares, dilutedShares }: ShareBasis) => [basicShares, dilutedShares];
+
+/** Shares implied by income and EPS, where EPS is large enough for that to mean anything. */
+const countsFromEps = ({ basicEps, dilutedEps, netIncome }: ShareBasis) =>
+  [basicEps, dilutedEps].map((eps) =>
+    netIncome && eps && Math.abs(eps) >= SMALLEST_TELLING_EPS ? Math.abs(netIncome / eps) : undefined,
+  );
+
+const reportsShares = (basis: ShareBasis) => reportedCounts(basis).some(Boolean);
+
+/** How far a period's share count moved between two filings, best evidence first. */
+function shareRatios(older: ShareBasis, newer: ShareBasis) {
+  const measure = reportsShares(newer) ? reportedCounts : countsFromEps;
+  const before = measure(older);
+  return measure(newer).flatMap((count, i) => {
+    const old = before[i];
+    return count && old ? [count / old] : [];
+  });
+}
+
+/**
+ * Whether EPS moved as a change in shares says it should, allowing for rounding to the
+ * cent and for income restated alongside, or undefined if the filings don't both have it.
+ * Even a small EPS can rule a split out, if not show one.
+ */
+function epsAgrees(older: ShareBasis, newer: ShareBasis, shares: number): boolean | undefined {
+  const income = older.netIncome && newer.netIncome ? newer.netIncome / older.netIncome : 1;
+  const verdicts = (["basicEps", "dilutedEps"] as const).flatMap((field) => {
+    const [before, after] = [older[field], newer[field]];
+    if (!before || !after) return [];
+    const expected = before * income;
+    const rounding = EPS_ROUNDING * (Math.abs(shares) + Math.abs(income));
+    return [Math.abs(after * shares - expected) <= rounding + SPLIT_TOLERANCE * Math.abs(expected)];
+  });
+  return verdicts.length > 0 ? verdicts.includes(true) : undefined;
+}
+
+/** Without share counts, a split has to be the one thing that changed, by too much to be anything else. */
+function epsAloneShowsSplit({ netIncome: before = 0 }: ShareBasis, { netIncome: after = 0 }: ShareBasis, factor: number) {
+  return nearSplit(after / before, 1) && Math.max(factor, 1 / factor) >= SMALLEST_SPLIT_FROM_EPS_ALONE;
+}
+
+/** Each pair of a period's filings that disagree on its share count, in the order they were filed. */
+function restatements(gaap: Gaap): Restatement[] {
+  const found: Restatement[] = [];
+  for (const filings of filedShareBases(gaap)) {
+    // Quarterly tables in 10-Ks have EPS but no share counts, and can repeat EPS as first
+    // filed, so they're only held against each other.
+    for (const comparable of [filings.filter(reportsShares), filings.filter((basis) => !reportsShares(basis))]) {
+      for (let i = 1; i < comparable.length; i++) {
+        const [older, newer] = [comparable[i - 1], comparable[i]];
+        const ratios = shareRatios(older, newer);
+        if (ratios.length > 0 && !nearSplit(ratios[0], 1)) found.push({ older, newer, ratios });
+      }
+    }
+  }
+  return found.sort((a, b) => a.newer.filed.localeCompare(b.newer.filed));
+}
+
+/** New shares for each old one, from the splits first reported after `date` and up to `until`. */
+const sharesPerShare = (splits: StockSplit[], date: string, until = "9999-12-31") =>
+  splits.reduce((shares, { filed, factor }) => (filed > date && filed <= until ? shares * factor : shares), 1);
+
+/**
+ * A company's splits, from its own restatements. Later filings repeat a past period
+ * on the new basis, which shows a split's size and when it reached the filings. A jump
+ * from one period to the next shows neither, as a merger makes one too. The evidence is
+ * a share count moved by a split-like ratio, with a second measure agreeing, as a single
+ * number can be a tagging mistake. EPS is that measure where it's tagged, as basic and
+ * diluted counts come from one table and share its mistakes. Splits already known from
+ * earlier filings come out first, as one restatement can span two of them.
+ */
+function stockSplits(gaap: Gaap): StockSplit[] {
+  const splits: StockSplit[] = [];
+  for (const { older, newer, ratios } of restatements(gaap)) {
+    const known = sharesPerShare(splits, older.filed, newer.filed);
+    const factor = splitFactor(ratios[0] / known);
+    if (!factor) continue;
+    const measuresAgree = ratios.length > 1 && nearSplit(ratios[1] / known, factor);
+    const confirmed = reportsShares(newer)
+      ? (epsAgrees(older, newer, factor * known) ?? measuresAgree)
+      : measuresAgree && epsAloneShowsSplit(older, newer, factor);
+    if (confirmed) splits.push({ filed: newer.filed, factor });
+  }
+  return splits;
+}
+
+/** A value on the basis of its filing, moved to the basis of the latest one. Dollar amounts have no basis. */
+function onLatestBasis(value: number, unit: LineSpec["unit"], filed: string, splits: StockSplit[]) {
+  if (unit === "shares") return value * sharesPerShare(splits, filed);
+  if (unit === "perShare") return value / sharesPerShare(splits, filed);
+  return value;
+}
+
 /** For each period, the first tag with a value, from its latest filing so that restatements apply. */
-function readSeries(gaap: Gaap, { tags, unit }: LineSpec): Series {
+function readSeries(gaap: Gaap, { tags, unit }: LineSpec, splits: StockSplit[]): Series {
   const units = unit === "perShare" ? "USD/shares" : unit === "shares" ? "shares" : "USD";
   const best = new Map<string, { tag: string; filed: string; value: number }>();
   for (const tag of tags) {
@@ -239,7 +412,7 @@ function readSeries(gaap: Gaap, { tags, unit }: LineSpec): Series {
       }
     }
   }
-  return new Map([...best].map(([key, { value }]) => [key, value]));
+  return new Map([...best].map(([key, { filed, value }]) => [key, onLatestBasis(value, unit, filed, splits)]));
 }
 
 /**
@@ -312,10 +485,11 @@ export function toFinancials(facts: CompanyFacts, period: FinancialPeriod): Stat
   if (available.length === 0) return null;
 
   const shown = available.slice(annual ? -ANNUAL_PERIODS : -QUARTERLY_PERIODS).reverse();
+  const splits = stockSplits(gaap);
 
-  // Per-share figures and share counts don't add up across quarters, so they're only ever as reported.
+  // Per-share figures and share counts don't add up across quarters, so they're never worked out from totals.
   const flowLine = (spec: LineSpec): StatementLine => {
-    const series = readSeries(gaap, spec);
+    const series = readSeries(gaap, spec, splits);
     const quarters = quarterValues(series, calendar, spec.unit === undefined);
     const values = shown.map(({ end }) =>
       annual ? (series.get(seriesKey(end, 4)) ?? null) : (quarters.get(end) ?? null),
@@ -323,7 +497,7 @@ export function toFinancials(facts: CompanyFacts, period: FinancialPeriod): Stat
     return lineOf(spec, values);
   };
   const balanceLine = (spec: LineSpec): StatementLine => {
-    const series = readSeries(gaap, spec);
+    const series = readSeries(gaap, spec, splits);
     return lineOf(spec, shown.map(({ end }) => series.get(seriesKey(end, 0)) ?? null));
   };
 

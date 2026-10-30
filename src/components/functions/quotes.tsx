@@ -51,19 +51,28 @@ interface QuoteCellsProps {
   loading: boolean;
   /** Shown as the last price when there's no quote. */
   missing?: string;
+  /** Overrides the decimals that `priceDecimals` picks. */
+  decimals?: number;
 }
 
 /** The Last, Change and % Change cells of a row. */
-export function QuoteCells({ quote, loading, missing = "—" }: QuoteCellsProps) {
+export function QuoteCells({ quote, loading, missing = "—", decimals }: QuoteCellsProps) {
   const change = quote?.change ?? 0;
   const tone = change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted";
+  const places = decimals ?? priceDecimals(quote?.price ?? 0);
   return (
     <>
-      <td>{quote ? <LastPrice price={quote.price} /> : <span className="text-muted">{loading ? "…" : missing}</span>}</td>
+      <td>
+        {quote ? (
+          <LastPrice price={quote.price} decimals={places} />
+        ) : (
+          <span className="text-muted">{loading ? "…" : missing}</span>
+        )}
+      </td>
       <td className={tone}>
         {quote?.change === undefined
           ? "—"
-          : `${change > 0 ? "▲ " : change < 0 ? "▼ " : ""}${formatChange(change, priceDecimals(quote.price))}`}
+          : `${change > 0 ? "▲ " : change < 0 ? "▼ " : ""}${formatChange(change, places)}`}
       </td>
       <td className={tone}>{quote?.changePercent === undefined ? "—" : formatPercent(quote.changePercent)}</td>
     </>
@@ -71,7 +80,7 @@ export function QuoteCells({ quote, loading, missing = "—" }: QuoteCellsProps)
 }
 
 /** Flashes green or red when the price changes. */
-function LastPrice({ price }: { price: number }) {
+function LastPrice({ price, decimals }: { price: number; decimals: number }) {
   const [seen, setSeen] = useState({ price, flash: "" });
   if (price !== seen.price) {
     setSeen({ price, flash: price > seen.price ? "animate-flash-up" : "animate-flash-down" });
@@ -79,7 +88,7 @@ function LastPrice({ price }: { price: number }) {
   // The key restarts the animation on every change.
   return (
     <span key={price} className={`rounded-sm px-0.5 ${seen.flash}`}>
-      {formatPrice(price)}
+      {formatPrice(price, decimals)}
     </span>
   );
 }

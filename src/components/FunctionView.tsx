@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { commandTitle, type Command } from "@/lib/commands";
 import { FUNCTION_BY_CODE } from "@/lib/functions";
-import { WORLD_INDICES } from "@/lib/monitors";
+import { MONITORS } from "@/lib/monitors";
 import { Help } from "./functions/Help";
 
 // Data panels fetch in the browser (and the chart draws on a canvas), so they never render on the server.
@@ -29,7 +29,8 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
-  if (command.fn === "WEI") return <QuoteMonitor groups={WORLD_INDICES} onOpen={onOpen} />;
+  const monitor = MONITORS[command.fn];
+  if (monitor) return <QuoteMonitor groups={monitor} onOpen={onOpen} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
       <p className="font-semibold">{commandTitle(command)}</p>

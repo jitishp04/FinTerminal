@@ -72,6 +72,22 @@ describe("quote", () => {
     expect((await quote(["AAPL", "GC=F"])).map((q) => q.symbol)).toEqual(["AAPL"]);
   });
 
+  it("keeps one incomplete row from failing the whole batch", async () => {
+    // Yahoo answers BRK.B with a stub, which fails the library's validation unless it's told not to throw.
+    yahoo.quote.mockResolvedValue([AAPL, { symbol: "BRK.B", quoteType: "EQUITY" }, { ...GOLD, regularMarketPrice: null }]);
+
+    expect((await quote(["AAPL", "BRK.B", "GC=F"])).map((q) => q.symbol)).toEqual(["AAPL"]);
+    expect(yahoo.quote).toHaveBeenCalledWith(["AAPL", "BRK.B", "GC=F"], {}, { validateResult: false });
+  });
+
+  it("answers under the symbol asked for when Yahoo renames a USD pair", async () => {
+    yahoo.quote.mockResolvedValue([{ ...AAPL, symbol: "JPY=X" }, { ...AAPL, symbol: "USDCAD=X" }, AAPL]);
+
+    const quotes = await quote(["USDJPY=X", "CAD=X", "AAPL"]);
+
+    expect(quotes.map((q) => q.symbol)).toEqual(["USDJPY=X", "CAD=X", "AAPL"]);
+  });
+
   it("asks Yahoo once within the TTL, and once per symbol", async () => {
     yahoo.quote.mockResolvedValue([AAPL]);
 
@@ -79,7 +95,7 @@ describe("quote", () => {
     await quote(["AAPL"]);
 
     expect(yahoo.quote).toHaveBeenCalledTimes(1);
-    expect(yahoo.quote).toHaveBeenCalledWith(["AAPL"]);
+    expect(yahoo.quote.mock.calls[0][0]).toEqual(["AAPL"]);
   });
 
   it("answers every 10-second watchlist poll with fresh data", async () => {

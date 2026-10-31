@@ -196,6 +196,12 @@ const LENGTH_TOLERANCE_DAYS = 25;
 
 const FISCAL_QUARTERS: Record<string, number> = { Q1: 1, Q2: 2, Q3: 3, FY: 4 };
 
+// About three years' filings: enough to outvote stale cover pages, and recent enough to
+// follow a company that changed how it numbers its years, as TJX did in 2022.
+const NUMBERING_VOTES = 15;
+// A 52-week year can end a few days into January, and it's still the year before.
+const YEAR_END_GRACE_DAYS = 7;
+
 /** What a filing reports about the shares behind a period's per-share figures. A combined tag serves as either kind. */
 const SHARE_BASIS = {
   basicShares: {
@@ -257,6 +263,11 @@ const seriesKey = (end: string, quarters: number) => `${end}/${quarters}`;
 // Only 10-Ks and 10-Qs. Proxy statements repeat figures later and rounded, which would
 // otherwise win as the latest filing, and foreign filers' 20-Fs are out of scope.
 const isPeriodicReport = (fact: Fact) => /^10-[KQ]/.test(fact.form);
+
+// Not a 10-K/A, which can repeat a year with the wrong dates, as RBC Bearings' does.
+const isFullYearReport = (fact: Fact) => fact.form === "10-K";
+// A transition report closes a year too, but it's the stub left by moving the year-end.
+const isYearEndReport = (fact: Fact) => isFullYearReport(fact) || fact.form === "10-KT";
 
 /** How long a fact covers: 0 quarters for a balance, 1 to 4 for a period, undefined for anything else. */
 function quartersSpanned(fact: Fact): number | undefined {
@@ -416,29 +427,94 @@ function readSeries(gaap: Gaap, { tags, unit }: LineSpec, splits: StockSplit[]):
 }
 
 /**
- * Every fiscal period the company reported on, oldest first. A filing's own period is
- * the latest one in it: earlier ones are comparison columns, which carry that filing's
- * fy and fp rather than their own.
+ * The fact for each filing's own period, oldest first. That's the latest one in it:
+ * earlier ones are comparison columns, and a period ending after the filing is a forecast.
  */
-function fiscalCalendar(gaap: Gaap): FiscalPeriod[] {
+function ownPeriods(gaap: Gaap): Fact[] {
   const ownPeriod = new Map<string, Fact>();
   for (const { tags } of [...INCOME, ...CASH_FLOW]) {
     for (const tag of tags) {
       for (const facts of Object.values(gaap[tag]?.units ?? {})) {
         for (const fact of facts) {
           const held = ownPeriod.get(fact.accn);
-          if (fact.start && isPeriodicReport(fact) && (!held || fact.end > held.end)) ownPeriod.set(fact.accn, fact);
+          const reported = fact.start && isPeriodicReport(fact) && fact.end <= fact.filed;
+          if (reported && (!held || fact.end > held.end)) ownPeriod.set(fact.accn, fact);
         }
       }
     }
   }
+  return [...ownPeriod.values()].sort((a, b) => a.end.localeCompare(b.end));
+}
 
-  const byEnd = new Map<string, FiscalPeriod>();
-  for (const { end, fy, fp } of ownPeriod.values()) {
-    const quarter = FISCAL_QUARTERS[fp ?? ""];
-    if (quarter && fy) byEnd.set(end, { end, fiscalYear: fy, quarter });
+/** The most common value, or the earliest of them on a tie: a stale tag comes after the one it copied. */
+function mostCommon(values: number[]) {
+  const counts = new Map<number, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  const highest = Math.max(...counts.values());
+  return values.find((value) => counts.get(value) === highest);
+}
+
+const quartersBetween = (from: string, to: string) =>
+  Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS / DAYS_PER_QUARTER);
+
+const closingYear = (end: string) => new Date(Date.parse(end) - YEAR_END_GRACE_DAYS * DAY_MS).getUTCFullYear();
+
+/**
+ * A filing's quarter, and its year as the calendar year it closes in. A quarter counts
+ * back from the 10-K closing its year, which holds if the year-end moves. Without one
+ * whose year the filing's period fits in, the year is still open or its 10-K is missing,
+ * so it counts on from the last year-end.
+ */
+function placeByDate(filing: Fact, yearEnds: string[], fullYearEnds: string[]) {
+  if (isYearEndReport(filing)) return { year: closingYear(filing.end), quarter: 4 };
+
+  const closing = fullYearEnds.find((end) => end >= filing.end);
+  if (closing && quartersBetween(filing.start ?? filing.end, closing) <= 4) {
+    return { year: closingYear(closing), quarter: 4 - quartersBetween(filing.end, closing) };
   }
-  return [...byEnd.values()].sort((a, b) => a.end.localeCompare(b.end));
+
+  const yearEnd = yearEnds.findLast((end) => end < filing.end) ?? yearEnds[0];
+  const quarters = quartersBetween(yearEnd, filing.end) || 1;
+  const yearsOn = Math.ceil(quarters / 4);
+  return { year: closingYear(yearEnd) + yearsOn, quarter: quarters - 4 * (yearsOn - 1) };
+}
+
+/**
+ * Every filing's period by its dates. The fy tags only say how far a company's numbering
+ * sits from the calendar: Walmart's year ending January 2026 is FY2026, but Target's is
+ * FY2025. A 10-K counts double, as some companies' 10-Qs give the calendar year instead.
+ */
+function periodsByDate(filings: Fact[]): FiscalPeriod[] {
+  const endsOf = (reports: Fact[]) => reports.map(({ end }) => end);
+  const yearEnds = endsOf(filings.filter(isYearEndReport));
+  const fullYearEnds = endsOf(filings.filter(isFullYearReport));
+  const placed = filings.map((filing) => ({ ...filing, ...placeByDate(filing, yearEnds, fullYearEnds) }));
+
+  const votes = placed.flatMap((filing) => {
+    if (!filing.fy) return [];
+    const offset = filing.fy - filing.year;
+    return isYearEndReport(filing) ? [offset, offset] : [offset];
+  });
+  const offset = mostCommon(votes.slice(-NUMBERING_VOTES)) ?? 0;
+  return placed.map(({ end, year, quarter }) => ({ end, fiscalYear: year + offset, quarter }));
+}
+
+const periodsByTag = (filings: Fact[]): FiscalPeriod[] =>
+  filings.flatMap(({ end, fy, fp }) => {
+    const quarter = FISCAL_QUARTERS[fp ?? ""];
+    return quarter && fy ? [{ end, fiscalYear: fy, quarter }] : [];
+  });
+
+/**
+ * Every fiscal period the company reported on, oldest first. A filing's fy and fp come
+ * from its cover page, where they can be left over from an earlier filing: Honeywell's
+ * 10-K for 2021 says 2020, and its 10-Q for that year's third quarter says Q2. So dates
+ * place a period, counted from the 10-Ks. A company with no 10-K yet only has the tags.
+ */
+function fiscalCalendar(gaap: Gaap): FiscalPeriod[] {
+  const filings = ownPeriods(gaap);
+  const periods = filings.some(isYearEndReport) ? periodsByDate(filings) : periodsByTag(filings);
+  return [...new Map(periods.map((period) => [period.end, period])).values()];
 }
 
 /**

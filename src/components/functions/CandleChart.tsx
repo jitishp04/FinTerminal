@@ -12,7 +12,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
-import { OVERLAYS, toSeries, type Overlay } from "@/lib/chartData";
+import { minBarSpacing, OVERLAYS, toSeries, type Overlay } from "@/lib/chartData";
 import { priceDecimals } from "@/lib/format";
 import type { Chart } from "@/lib/types";
 
@@ -100,21 +100,27 @@ export function CandleChart({ data, style, overlays }: { data: Chart; style: Cha
     const h = handles.current;
     if (!h) return;
     const { bars, overlays: lines } = toSeries(data);
-    const decimals = priceDecimals(bars.at(-1)?.close ?? 100);
+    const decimals = data.decimals ?? priceDecimals(bars.at(-1)?.close ?? 100);
     const priceFormat = { type: "price", precision: decimals, minMove: 10 ** -decimals } as const;
 
     h.candles.applyOptions({ priceFormat });
     h.candles.setData(bars.map(({ time, open, high, low, close }) => ({ time: at(time), open, high, low, close })));
     h.line.applyOptions({ priceFormat });
     h.line.setData(bars.map((b) => ({ time: at(b.time), value: b.close })));
+    // A bar with no volume would still draw a line along the bottom.
+    const traded = bars.filter((b) => b.volume > 0);
     h.volume.setData(
-      bars.map((b) => ({ time: at(b.time), value: b.volume, color: b.close >= b.open ? h.volumeUp : h.volumeDown })),
+      traded.map((b) => ({ time: at(b.time), value: b.volume, color: b.close >= b.open ? h.volumeUp : h.volumeDown })),
     );
+    // With no volume at all, the price can use the space kept for it.
+    h.chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.08, bottom: traded.length > 0 ? 0.25 : 0.08 } });
     for (const name of OVERLAY_NAMES) {
       h.overlays[name].applyOptions({ priceFormat });
       h.overlays[name].setData(lines[name].map((p) => ({ time: at(p.time), value: p.value })));
     }
-    h.chart.applyOptions({ timeScale: { timeVisible: data.interval.endsWith("m") } });
+    h.chart.applyOptions({
+      timeScale: { timeVisible: data.interval.endsWith("m"), minBarSpacing: minBarSpacing(bars.length) },
+    });
 
     const key = `${data.symbol} ${data.range}`;
     if (fitted.current !== key) {
@@ -131,5 +137,5 @@ export function CandleChart({ data, style, overlays }: { data: Chart; style: Cha
     for (const name of OVERLAY_NAMES) h.overlays[name].applyOptions({ visible: overlays.includes(name) });
   }, [style, overlays]);
 
-  return <div ref={container} role="figure" aria-label={`${data.symbol} price chart, ${data.range}`} className="absolute inset-0" />;
+  return <div ref={container} role="figure" aria-label={`${data.symbol} chart, ${data.range}`} className="absolute inset-0" />;
 }

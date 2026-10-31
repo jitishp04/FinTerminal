@@ -9,6 +9,13 @@ export const OVERLAYS = {
 };
 export type Overlay = keyof typeof OVERLAYS;
 
+// The chart library's own limit, and the narrowest plot that should still fit every bar.
+const DEFAULT_MIN_BAR_SPACING = 0.5;
+const NARROWEST_PLOT = 200;
+
+/** Decades of daily readings are denser than the library's limit, which would cut off their start. */
+export const minBarSpacing = (bars: number) => Math.min(DEFAULT_MIN_BAR_SPACING, NARROWEST_PLOT / bars);
+
 export interface LinePoint {
   time: number;
   value: number;
@@ -27,6 +34,7 @@ const formats = new Map<string, Intl.DateTimeFormat>();
  * works in UTC only, so this is how it shows exchange hours and dates.
  */
 export function wallClock(time: number, timeZone: string): number {
+  if (timeZone === "UTC") return time;
   let format = formats.get(timeZone);
   if (!format) {
     format = new Intl.DateTimeFormat("en-US", {

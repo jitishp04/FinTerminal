@@ -218,8 +218,18 @@ const SHARE_BASIS = {
   commonIncome: { tags: ["NetIncomeLossAvailableToCommonStockholdersBasic"], units: "USD" },
 };
 
+/** Each kind of count, and the EPS that goes with it. */
+const COUNT_KINDS = [
+  { count: "basicShares", eps: "basicEps" },
+  { count: "dilutedShares", eps: "dilutedEps" },
+] as const;
+
 /** Share counts and EPS are rounded, so restated figures land near a split's ratio, not on it. */
 const SPLIT_TOLERANCE = 0.02;
+// A split multiplies every count alike, so one with income restated has to land this close. A merger only lands near.
+const EXACT_SPLIT_TOLERANCE = 0.0025;
+// Accounting changes can restate income beside a split, by 1.49 times at ICE. A merger's new history moves it further.
+const LARGEST_INCOME_RESTATEMENT = 2;
 // Stock dividends of a few percent stay as filed: they look too much like an accounting change.
 const SMALLEST_SPLIT = 1.15;
 // Filings sometimes tag a share count in thousands or millions by mistake, and that's a factor of 1,000 or more.
@@ -230,6 +240,10 @@ const EPS_ROUNDING = 0.005;
 const SMALLEST_TELLING_EPS = 0.25;
 // EPS can be restated by less than this for other reasons, while income stays the same.
 const SMALLEST_SPLIT_FROM_EPS_ALONE = 2;
+/** The SEC's tag for a split's ratio, which filers also use for stock dividends and conversions. */
+const STATED_SPLIT_TAG = "StockholdersEquityNoteStockSplitConversionRatio1";
+// A merger's shares can keep the counts this far from a split that came with it: 12% at Sirius XM.
+const STATED_SPLIT_TOLERANCE = 0.2;
 
 /** A count in the wrong scale is off by a power of this: thousands, millions, or three zeros too many. */
 const SCALE_STEP = 1000;
@@ -256,7 +270,9 @@ type ShareBasis = Partial<Record<keyof typeof SHARE_BASIS, number>> & {
   filed: string;
 };
 
-/** A filing's diluted count for a period, and the scale income over EPS puts it in. */
+type CountKind = (typeof COUNT_KINDS)[number];
+
+/** A filing's count for a period, and the scale income over EPS puts it in. */
 interface ScaledCount {
   key: string;
   end: string;
@@ -275,6 +291,12 @@ interface Restatement {
 interface StockSplit {
   filed: string;
   factor: number;
+}
+
+/** A filing's count for the latest period it reports. */
+interface OwnCount {
+  filed: string;
+  count: number;
 }
 
 export type Statements = Omit<Financials, "symbol">;
@@ -349,46 +371,57 @@ function scaleFromIncome(count: number, eps: number | undefined, netIncome: numb
 
 const countKey = (accn: string, end: string, quarters: number) => `${accn}/${seriesKey(end, quarters)}`;
 
-/** Every diluted count in a company's filings that income over EPS can place. */
-function scaledCounts(gaap: Gaap): ScaledCount[] {
+/** Every count of a kind in a company's filings that income over EPS can place. */
+function scaledCounts(gaap: Gaap, { count, eps }: CountKind): ScaledCount[] {
   return filedShareBases(gaap)
     .flat()
-    .flatMap(({ accn, end, quarters, dilutedShares: count, dilutedEps, netIncome, commonIncome }) => {
-      const scale = count ? scaleFromIncome(count, dilutedEps, netIncome ?? commonIncome) : undefined;
-      return count && scale ? [{ key: countKey(accn, end, quarters), end, count, scale }] : [];
+    .flatMap((basis) => {
+      const { accn, end, quarters, netIncome, commonIncome } = basis;
+      const shares = basis[count];
+      const scale = shares ? scaleFromIncome(shares, basis[eps], netIncome ?? commonIncome) : undefined;
+      return shares && scale ? [{ key: countKey(accn, end, quarters), end, count: shares, scale }] : [];
     });
 }
 
-/**
- * A company's facts with its diluted counts in whole shares. Filings sometimes tag a count
- * in thousands or millions, or with three zeros too many. Income over EPS shows that
- * something's off, but not what: Halliburton's counts are right and its EPS is tagged in
- * millions. So the count that matches income nearest in time has to show the same scale,
- * and any count where they differ stays as filed. It's nearest in time as a company's
- * shares can change a lot over the years, and a filing's own columns can be in two scales.
- */
-function inWholeShares(gaap: Gaap): Gaap {
-  const counts = scaledCounts(gaap);
+/** The factor that puts each of a kind's counts right, by filing and period. */
+function wrongScales(gaap: Gaap, kind: CountKind) {
+  const counts = scaledCounts(gaap, kind);
   const matching = counts.filter(({ scale }) => scale === 1);
-  if (matching.length === 0) return gaap;
-
   const wrongScale = new Map<string, number>();
+  if (matching.length === 0) return wrongScale;
+
   for (const { key, end, count, scale } of counts) {
     if (scale === 1) continue;
     const apart = (other: ScaledCount) => Math.abs(Date.parse(other.end) - Date.parse(end));
     const nearest = matching.reduce((best, other) => (apart(other) < apart(best) ? other : best));
     if (scaleBetween(count, nearest.count) === scale) wrongScale.set(key, scale);
   }
-  if (wrongScale.size === 0) return gaap;
+  return wrongScale;
+}
 
-  const inScale = (fact: Fact) => {
-    const scale = wrongScale.get(countKey(fact.accn, fact.end, quartersSpanned(fact) ?? 0));
-    return scale ? { ...fact, val: Math.round(fact.val * scale) } : fact;
-  };
+/**
+ * A company's facts with its counts in whole shares. Filings sometimes tag a count
+ * in thousands or millions, or with three zeros too many. Income over EPS shows that
+ * something's off, but not what: Halliburton's counts are right and its EPS is tagged in
+ * millions. So the count that matches income nearest in time has to show the same scale,
+ * and any count where they differ stays as filed. It's nearest in time as a company's
+ * shares can change a lot over the years, and a filing's own columns can be in two scales.
+ * Basic and diluted counts are judged apart, as one can be in scale beside the other.
+ */
+function inWholeShares(gaap: Gaap): Gaap {
   const corrected = { ...gaap };
-  for (const tag of SHARE_BASIS.dilutedShares.tags) {
-    const shares = gaap[tag]?.units.shares;
-    if (shares) corrected[tag] = { units: { ...gaap[tag].units, shares: shares.map(inScale) } };
+  for (const kind of COUNT_KINDS) {
+    const wrongScale = wrongScales(gaap, kind);
+    if (wrongScale.size === 0) continue;
+
+    const inScale = (fact: Fact) => {
+      const scale = wrongScale.get(countKey(fact.accn, fact.end, quartersSpanned(fact) ?? 0));
+      return scale ? { ...fact, val: Math.round(fact.val * scale) } : fact;
+    };
+    for (const tag of SHARE_BASIS[kind.count].tags) {
+      const shares = gaap[tag]?.units.shares;
+      if (shares) corrected[tag] = { units: { ...gaap[tag].units, shares: shares.map(inScale) } };
+    }
   }
   return corrected;
 }
@@ -437,9 +470,9 @@ function epsAloneShowsSplit({ netIncome: before = 0 }: ShareBasis, { netIncome: 
   return nearSplit(after / before, 1) && Math.max(factor, 1 / factor) >= SMALLEST_SPLIT_FROM_EPS_ALONE;
 }
 
-/** Each pair of a period's filings that disagree on its share count, in the order they were filed. */
-function restatements(gaap: Gaap): Restatement[] {
-  const found: Restatement[] = [];
+/** Each pair of a period's filings that disagree on its share count, by the later filing, in the order they were filed. */
+function restatements(gaap: Gaap): Restatement[][] {
+  const found = new Map<string, Restatement[]>();
   for (const filings of filedShareBases(gaap)) {
     // Quarterly tables in 10-Ks have EPS but no share counts, and can repeat EPS as first
     // filed, so they're only held against each other.
@@ -447,16 +480,97 @@ function restatements(gaap: Gaap): Restatement[] {
       for (let i = 1; i < comparable.length; i++) {
         const [older, newer] = [comparable[i - 1], comparable[i]];
         const ratios = shareRatios(older, newer);
-        if (ratios.length > 0 && !nearSplit(ratios[0], 1)) found.push({ older, newer, ratios });
+        if (ratios.length > 0 && !nearSplit(ratios[0], 1)) {
+          found.set(newer.filed, [...(found.get(newer.filed) ?? []), { older, newer, ratios }]);
+        }
       }
     }
   }
-  return found.sort((a, b) => a.newer.filed.localeCompare(b.newer.filed));
+  return [...found.keys()].sort().map((filed) => found.get(filed) ?? []);
 }
 
 /** New shares for each old one, from the splits first reported after `date` and up to `until`. */
 const sharesPerShare = (splits: StockSplit[], date: string, until = "9999-12-31") =>
   splits.reduce((shares, { filed, factor }) => (filed > date && filed <= until ? shares * factor : shares), 1);
+
+/** Whether income moved too far between two filings for both to be one company's history. */
+function incomeReplaced({ netIncome: before }: ShareBasis, { netIncome: after }: ShareBasis) {
+  if (!before || !after) return false;
+  const income = after / before;
+  return income < 1 / LARGEST_INCOME_RESTATEMENT || income > LARGEST_INCOME_RESTATEMENT;
+}
+
+/** Whether two filings disagree on income. Nothing against something counts, as a new SPAC's first quarter can be zero. */
+const incomeRestated = ({ netIncome: before }: ShareBasis, { netIncome: after }: ShareBasis) =>
+  before !== undefined && after !== undefined && Math.abs(after - before) > SPLIT_TOLERANCE * Math.abs(before);
+
+function landsOnSplit(ratio: number) {
+  const factor = splitFactor(ratio);
+  return factor !== undefined && Math.abs(ratio / factor - 1) <= EXACT_SPLIT_TOLERANCE;
+}
+
+/**
+ * Whether a filing put another company's history in place of this one's, as a reverse
+ * merger or a SPAC's merger does. That restates share counts, often by a ratio near a
+ * split's, and EPS follows them, so what gives it away is income moving too. A split can
+ * come with restated income, as at ICE, or a different tag for it, as at Tenet, so a period
+ * that lands on a split with income in reach clears the filing, whatever its others do.
+ */
+function replacesHistory(filing: Restatement[]) {
+  const clears = ({ older, newer, ratios }: Restatement) => landsOnSplit(ratios[0]) && !incomeReplaced(older, newer);
+  return filing.some(({ older, newer }) => incomeRestated(older, newer)) && !filing.some(clears);
+}
+
+/** Each filing's count for its latest and shortest period, as a year to date lags. Oldest filing first. */
+function ownCounts(gaap: Gaap): OwnCount[] {
+  const own = new Map<string, ShareBasis>();
+  for (const basis of filedShareBases(gaap).flat()) {
+    const held = own.get(basis.accn);
+    const later = !held || basis.end > held.end || (basis.end === held.end && basis.quarters < held.quarters);
+    if (reportsShares(basis) && later) own.set(basis.accn, basis);
+  }
+  return [...own.values()]
+    .map((basis) => ({ filed: basis.filed, count: reportedCounts(basis).find(Boolean) ?? 0 }))
+    .sort((a, b) => a.filed.localeCompare(b.filed));
+}
+
+/**
+ * The first filing on a split's new basis: the one whose count stepped by the split from
+ * the filing before, once splits already known come out. That can be long before anything
+ * can be compared, as at Aebi Schmidt. Undefined if no step is nearer to the split than to
+ * no change.
+ */
+function firstOnNewBasis(counts: OwnCount[], older: ShareBasis, newer: ShareBasis, factor: number, splits: StockSplit[]) {
+  let first: string | undefined;
+  let nearest = Math.abs(Math.log(factor)) / 2;
+  for (let i = 1; i < counts.length; i++) {
+    const [before, after] = [counts[i - 1], counts[i]];
+    if (after.filed <= older.filed || after.filed > newer.filed) continue;
+    const step = after.count / before.count / sharesPerShare(splits, before.filed, after.filed);
+    const distance = Math.abs(Math.log(step / factor));
+    if (distance < nearest) [first, nearest] = [after.filed, distance];
+  }
+  return first;
+}
+
+/**
+ * A split that came with a filing replacing a company's history, as Sirius XM's did with
+ * Liberty's merger. The merger's shares keep the counts off an exact ratio, so it takes
+ * that filing's own word, and counts that moved close to it, as filers state other ratios
+ * too: Riley's 83 is its one-twelfth, and AGNT's 2 is a split already known.
+ */
+function statedSplit(gaap: Gaap, filing: Restatement[], splits: StockSplit[]): StockSplit | undefined {
+  for (const { older, newer, ratios } of filing) {
+    const moved = ratios[0] / sharesPerShare(splits, older.filed, newer.filed);
+    for (const { accn, val } of gaap[STATED_SPLIT_TAG]?.units.pure ?? []) {
+      const factor = splitFactor(val);
+      if (accn === newer.accn && factor && Math.abs(moved / factor - 1) <= STATED_SPLIT_TOLERANCE) {
+        return { filed: newer.filed, factor };
+      }
+    }
+  }
+  return undefined;
+}
 
 /**
  * A company's splits, from its own restatements. Later filings repeat a past period
@@ -466,18 +580,39 @@ const sharesPerShare = (splits: StockSplit[], date: string, until = "9999-12-31"
  * number can be a tagging mistake. EPS is that measure where it's tagged, as basic and
  * diluted counts come from one table and share its mistakes. Splits already known from
  * earlier filings come out first, as one restatement can span two of them.
+ *
+ * Once a filing replaces a company's history, nothing filed before it says anything about
+ * what's filed after, however close later figures happen to come. Only that filing can
+ * say a split came with it.
  */
 function stockSplits(gaap: Gaap): StockSplit[] {
+  const counts = ownCounts(gaap);
   const splits: StockSplit[] = [];
-  for (const { older, newer, ratios } of restatements(gaap)) {
-    const known = sharesPerShare(splits, older.filed, newer.filed);
-    const factor = splitFactor(ratios[0] / known);
-    if (!factor) continue;
-    const measuresAgree = ratios.length > 1 && nearSplit(ratios[1] / known, factor);
-    const confirmed = reportsShares(newer)
-      ? (epsAgrees(older, newer, factor * known) ?? measuresAgree)
-      : measuresAgree && epsAloneShowsSplit(older, newer, factor);
-    if (confirmed) splits.push({ filed: newer.filed, factor });
+  let replaced = "";
+  for (const restated of restatements(gaap)) {
+    const comparable = restated.filter(({ older }) => older.filed >= replaced);
+    if (replacesHistory(comparable)) {
+      replaced = restated[0].newer.filed;
+      const stated = statedSplit(gaap, comparable, splits);
+      if (stated) splits.push(stated);
+      continue;
+    }
+    for (const { older, newer, ratios } of comparable) {
+      const known = sharesPerShare(splits, older.filed, newer.filed);
+      const factor = splitFactor(ratios[0] / known);
+      if (!factor) continue;
+      const measuresAgree = ratios.length > 1 && nearSplit(ratios[1] / known, factor);
+      const confirmed = reportsShares(newer)
+        ? (epsAgrees(older, newer, factor * known) ?? measuresAgree)
+        : measuresAgree && epsAloneShowsSplit(older, newer, factor);
+      if (!confirmed) continue;
+      const first = firstOnNewBasis(counts, older, newer, factor, splits);
+      // A share issue can hide a split's step, as at Service Properties, but then its ratio has to be
+      // exact: Enliven's 2.21 is one bad tag. EPS is rounded, so a table with no counts can't be.
+      if (first || !reportsShares(newer) || landsOnSplit(ratios[0] / known)) {
+        splits.push({ filed: first ?? newer.filed, factor });
+      }
+    }
   }
   return splits;
 }
@@ -664,8 +799,7 @@ export function toFinancials(facts: CompanyFacts, period: FinancialPeriod): Stat
   if (available.length === 0) return null;
 
   const shown = available.slice(annual ? -ANNUAL_PERIODS : -QUARTERLY_PERIODS).reverse();
-  // Counts as filed: once put right, a merger that recast a company's history can pass for a split.
-  const splits = stockSplits(filed);
+  const splits = stockSplits(gaap);
 
   // Per-share figures and share counts don't add up across quarters, so they're never worked out from totals.
   const flowLine = (spec: LineSpec): StatementLine => {

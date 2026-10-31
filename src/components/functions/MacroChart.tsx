@@ -47,7 +47,8 @@ export function MacroChart({ id }: { id: string }) {
   return (
     <div className="flex h-full flex-col gap-1.5">
       <p className="flex items-baseline gap-2 whitespace-nowrap">
-        <span title={series.data.title} className="min-w-0 truncate text-muted">
+        {/* The title gives way first: the units say what the number is. */}
+        <span title={series.data.title} className="min-w-0 shrink-[999] truncate text-muted">
           {series.data.title}
         </span>
         <span className="ml-auto text-base font-semibold">{formatPrice(latest.value, series.data.decimals)}</span>

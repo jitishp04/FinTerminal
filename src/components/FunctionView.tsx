@@ -1,9 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { commandTitle, type Command } from "@/lib/commands";
+import type { Command } from "@/lib/commands";
 import { FILING_FILTERS, INSIDER_FILTERS } from "@/lib/filings";
-import { FUNCTION_BY_CODE } from "@/lib/functions";
 import { MONITORS } from "@/lib/monitors";
 import { Help } from "./functions/Help";
 
@@ -31,6 +30,10 @@ const MacroDashboard = dynamic(() => import("./functions/MacroDashboard").then((
 const MacroChart = dynamic(() => import("./functions/MacroChart").then((m) => m.MacroChart), {
   ssr: false,
   loading: () => <p className="text-muted">Loading chart…</p>,
+});
+const YieldCurve = dynamic(() => import("./functions/YieldCurve").then((m) => m.YieldCurve), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading yield curve…</p>,
 });
 const Watchlist =dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
   ssr: false,
@@ -60,16 +63,10 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "ECO") {
     return command.args[0] ? <MacroChart id={command.args[0]} /> : <MacroDashboard onOpen={onOpen} />;
   }
+  if (command.fn === "CURV") return <YieldCurve />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;
   const monitor = MONITORS[command.fn];
-  if (monitor) return <QuoteMonitor groups={monitor} onOpen={onOpen} />;
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-      <p className="font-semibold">{commandTitle(command)}</p>
-      <p className="text-muted">{FUNCTION_BY_CODE.get(command.fn)?.description}</p>
-      <p className="mt-3 text-xs text-muted">Coming soon: this panel fills in once its data source is connected.</p>
-    </div>
-  );
+  return monitor ? <QuoteMonitor groups={monitor} onOpen={onOpen} /> : null;
 }

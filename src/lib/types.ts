@@ -129,6 +129,24 @@ export interface MacroIndicator {
   trend: number[];
 }
 
+export interface CurvePoint {
+  /** "1M", "10Y", … */
+  tenor: string;
+  /** Yields in percent. */
+  latest: number;
+  monthAgo: number;
+  yearAgo: number;
+  /** It yields less than the tenor before it. */
+  inverted: boolean;
+}
+
+export interface YieldCurve {
+  /** The day each of the three curves is from. */
+  dates: { latest: string; monthAgo: string; yearAgo: string };
+  /** Shortest maturity first. */
+  points: CurvePoint[];
+}
+
 export interface Chart {
   symbol: string;
   range: ChartRange | MacroRange;

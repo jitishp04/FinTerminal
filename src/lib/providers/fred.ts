@@ -1,7 +1,8 @@
 import { ApiError } from "../api";
 import { cached } from "../cache";
+import { TENORS, toCurve } from "../curve";
 import { INDICATORS, toIndicator } from "../macro";
-import type { MacroIndicator, MacroSeries, Observation } from "../types";
+import type { MacroIndicator, MacroSeries, Observation, YieldCurve } from "../types";
 
 const BASE = "https://api.stlouisfed.org/fred";
 
@@ -71,4 +72,9 @@ export async function series(id: string): Promise<MacroSeries> {
 /** The ECO dashboard's rows. */
 export function dashboard(): Promise<MacroIndicator[]> {
   return Promise.all(INDICATORS.map(async (def) => toIndicator(def, (await readings(def.id)).observations)));
+}
+
+/** The Treasury curve now, a month ago and a year ago. */
+export async function curve(): Promise<YieldCurve> {
+  return toCurve(await Promise.all(TENORS.map(async ({ id }) => (await readings(id)).observations)));
 }

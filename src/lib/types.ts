@@ -45,8 +45,10 @@ export type FinancialPeriod = (typeof FINANCIAL_PERIODS)[number];
 export interface StatementPeriod {
   /** Date the period ended, e.g. "2025-09-27". */
   end: string;
-  /** The company's own fiscal naming, e.g. "FY2025" or "Q3 FY2026". */
+  /** The company's own fiscal naming, e.g. "FY2025" or "Q3 FY2026", or "FY2025T" for a transition period. */
   label: string;
+  /** Part of a transition period: the stub filed when a company moves its year-end. */
+  transition?: boolean;
 }
 
 export interface StatementLine {

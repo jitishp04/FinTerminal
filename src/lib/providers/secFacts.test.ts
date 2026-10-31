@@ -1576,7 +1576,7 @@ describe("fiscal periods, whatever a filing's cover page says", () => {
     expect(labels(facts, "annual")).toEqual(["FY2024", "FY2023", "FY2022", "FY2021"]);
   });
 
-  it("keeps the years either side of a changed year-end, as when Royal Gold moved to December", () => {
+  it("gives a transition period its own label between the years either side, as when Royal Gold moved to December", () => {
     const facts = company("NetCashProvidedByUsedInOperatingActivities", [
       ["2019-07-01", "2020-06-30", 340_752_000, "0001558370-20-009452", 2020, "FY", "10-K", "2020-08-06"],
       ["2020-07-01", "2021-06-30", 407_151_000, "0001558370-21-011343", 2021, "FY", "10-K", "2021-08-12"],
@@ -1585,7 +1585,7 @@ describe("fiscal periods, whatever a filing's cover page says", () => {
     ]);
     expect(statements(facts, "annual").periods).toEqual([
       { end: "2022-12-31", label: "FY2022" },
-      { end: "2021-12-31", label: "FY2021" },
+      { end: "2021-12-31", label: "FY2021T", transition: true },
       { end: "2021-06-30", label: "FY2021" },
       { end: "2020-06-30", label: "FY2020" },
     ]);
@@ -1656,18 +1656,101 @@ describe("fiscal periods, whatever a filing's cover page says", () => {
     expect(labels(facts, "quarterly")).toEqual(["Q1 FY2026", "Q4 FY2025"]);
   });
 
-  it("numbers quarters in a transition period as filed, as when Ferguson moved to December", () => {
-    const facts = company("NetCashProvidedByUsedInOperatingActivities", [
-      ["2024-08-01", "2025-04-30", 1_367_000_000, "0002011641-25-000015", 2025, "Q3", "10-Q", "2025-06-03"],
-      ["2024-08-01", "2025-07-31", 1_908_000_000, "0002011641-25-000027", 2025, "FY", "10-K", "2025-09-26"],
-      ["2025-08-01", "2025-10-31", 430_000_000, "0002011641-25-000059", 2026, "Q1", "10-Q", "2025-12-09"],
-      ["2025-08-01", "2025-12-31", 859_000_000, "0002011641-26-000006", 2025, "FY", "10-KT", "2026-02-27"],
-      ["2026-01-01", "2026-03-31", 772_000_000, "0002011641-26-000030", 2026, "Q1", "10-Q", "2026-05-05"],
+  // Its 10-Q for October 2025 opened a fiscal 2026 that the move to December cut short.
+  const ferguson = company("NetCashProvidedByUsedInOperatingActivities", [
+    ["2024-08-01", "2025-04-30", 1_367_000_000, "0002011641-25-000015", 2025, "Q3", "10-Q", "2025-06-03"],
+    ["2024-08-01", "2025-07-31", 1_908_000_000, "0002011641-25-000027", 2025, "FY", "10-K", "2025-09-26"],
+    ["2025-08-01", "2025-10-31", 430_000_000, "0002011641-25-000059", 2026, "Q1", "10-Q", "2025-12-09"],
+    ["2025-08-01", "2025-12-31", 859_000_000, "0002011641-26-000006", 2025, "FY", "10-KT", "2026-02-27"],
+    ["2026-01-01", "2026-03-31", 772_000_000, "0002011641-26-000030", 2026, "Q1", "10-Q", "2026-05-05"],
+  ]);
+
+  it("keeps a transition period apart from the year before it, as when Ferguson moved to December", () => {
+    expect(labels(ferguson, "annual")).toEqual(["FY2025T", "FY2025"]);
+  });
+
+  it("puts a quarter from a year the move cut short in the transition period, as at Ferguson", () => {
+    expect(labels(ferguson, "quarterly")).toEqual(["Q1 FY2026", "FY2025T", "Q1 FY2025T", "Q4 FY2025", "Q3 FY2025"]);
+  });
+
+  it("keeps a transition period's balance sheet, though its cash flow isn't a quarter or a year", () => {
+    const assets = company("Assets", [
+      [undefined, "2025-12-31", 17_152_000_000, "0002011641-26-000006", 2025, "FY", "10-KT", "2026-02-27"],
     ]);
-    const labelAt = (end: string) => statements(facts, "quarterly").periods.find((period) => period.end === end)?.label;
-    expect(labelAt("2025-04-30")).toBe("Q3 FY2025");
-    expect(labelAt("2025-10-31")).toBe("Q1 FY2026");
-    expect(labelAt("2026-03-31")).toBe("Q1 FY2026");
+    const facts = { ...ferguson, facts: { "us-gaap": { ...ferguson.facts["us-gaap"], ...assets.facts["us-gaap"] } } };
+    const annual = statements(facts, "annual");
+    expect(value(annual, "balance", "totalAssets", "FY2025T")).toBe(17_152_000_000);
+    expect(value(annual, "cashFlow", "operatingCashFlow", "FY2025T")).toBeNull();
+    expect(value(statements(facts, "quarterly"), "balance", "totalAssets", "FY2025T")).toBe(17_152_000_000);
+  });
+
+  it("names a transition period the same in both views, as Transuite's single month is no quarter", () => {
+    const facts = company("NetCashProvidedByUsedInOperatingActivities", [
+      ["2023-12-01", "2024-11-30", -191_882, "0001640334-25-000412", 2024, "FY", "10-K", "2025-03-17"],
+      ["2024-12-01", "2024-12-31", -7_450, "0001640334-25-000521", 2024, "FY", "10-KT", "2025-03-28"],
+      ["2025-01-01", "2025-03-31", -72_146, "0001640334-25-000829", 2025, "Q1", "10-Q", "2025-05-13"],
+    ]);
+    expect(labels(facts, "annual")).toEqual(["FY2024T", "FY2024"]);
+    expect(labels(facts, "quarterly")).toEqual(["Q1 FY2025", "FY2024T", "Q4 FY2024"]);
+  });
+
+  it("leaves quarters of the year a transition period closes as filed, as when Greif moved to September", () => {
+    const facts = company("NetCashProvidedByUsedInOperatingActivities", [
+      ["2023-11-01", "2024-10-31", 356_000_000, "0000043920-24-000056", 2024, "FY", "10-K", "2024-12-23"],
+      ["2024-11-01", "2025-01-31", -30_800_000, "0000043920-25-000009", 2025, "Q1", "10-Q", "2025-02-27"],
+      ["2024-11-01", "2025-04-30", 105_600_000, "0000043920-25-000025", 2025, "Q2", "10-Q", "2025-06-05"],
+      ["2024-11-01", "2025-07-31", 303_300_000, "0000043920-25-000048", 2025, "Q3", "10-Q", "2025-08-28"],
+      ["2024-11-01", "2025-09-30", 58_600_000, "0001628280-25-053146", 2025, "FY", "10-KT", "2025-11-19"],
+      ["2025-10-01", "2025-12-31", -24_400_000, "0001628280-26-004414", 2026, "Q1", "10-Q", "2026-01-30"],
+    ]);
+    expect(labels(facts, "annual")).toEqual(["FY2025T", "FY2024"]);
+    expect(labels(facts, "quarterly")).toEqual([
+      "Q1 FY2026",
+      "FY2025T",
+      "Q3 FY2025",
+      "Q2 FY2025",
+      "Q1 FY2025",
+      "Q4 FY2024",
+    ]);
+  });
+
+  it("still works out quarters from year-to-date totals inside a transition period, as at Red Cat", () => {
+    const facts = company("Revenues", [
+      ["2023-05-01", "2024-04-30", 17_836_382, "0001554795-24-000195", 2024, "FY", "10-K", "2024-08-08"],
+      ["2024-05-01", "2024-07-31", 2_776_535, "0001554795-24-000238", 2025, "Q1", "10-Q", "2024-09-23"],
+      ["2024-05-01", "2024-10-31", 4_311_262, "0001554795-24-000344", 2025, "Q2", "10-Q", "2024-12-16"],
+      ["2024-05-01", "2024-12-31", 4_850_304, "0001641172-25-001892", 2024, "FY", "10-KT", "2025-03-31"],
+      ["2025-01-01", "2025-03-31", 1_629_662, "0001641172-25-010350", 2025, "Q1", "10-Q", "2025-05-14"],
+    ]);
+    const result = statements(facts, "quarterly");
+    expect(result.periods.map(({ label }) => label)).toEqual([
+      "Q1 FY2025",
+      "FY2024T",
+      "Q2 FY2024T",
+      "Q1 FY2024T",
+      "Q4 FY2024",
+    ]);
+    expect(value(result, "income", "revenue", "Q2 FY2024T")).toBe(1_534_727);
+  });
+
+  it("doesn't repeat a quarter when a 10-Q covers the same months as a 10-KT, as at Republic Airways", () => {
+    const facts = company("NetCashProvidedByUsedInOperatingActivities", [
+      ["2023-10-01", "2024-09-30", 34_244_000, "0000950170-25-070705", 2024, "FY", "10-K", "2025-05-14"],
+      ["2024-10-01", "2024-12-31", -11_561_000, "0001193125-25-290253", 2024, "FY", "10-KT", "2025-11-21"],
+      ["2024-10-01", "2024-12-31", -11_561_000, "0000950170-25-073787", 2025, "Q1", "10-Q", "2025-05-19"],
+      ["2024-10-01", "2025-03-31", -33_951_000, "0000950170-25-075201", 2025, "Q2", "10-Q", "2025-05-20"],
+      ["2025-01-01", "2025-12-31", 322_000_000, "0001628280-26-019614", 2025, "FY", "10-K", "2026-03-19"],
+    ]);
+    expect(labels(facts, "quarterly")).toEqual(["Q4 FY2025", "Q1 FY2025", "Q1 FY2024T", "Q4 FY2024"]);
+  });
+
+  it("names a transition period in the company's own numbering, as when Best Buy moved to February", () => {
+    const facts = company("NetCashProvidedByUsedInOperatingActivities", [
+      ["2011-02-27", "2012-03-03", 3_293_000_000, "0000764478-12-000035", 2011, "FY", "10-K", "2012-05-01"],
+      ["2012-03-04", "2013-02-02", 1_454_000_000, "0000764478-13-000014", 2012, "FY", "10-KT", "2013-03-27"],
+      ["2013-02-03", "2014-02-01", 1_094_000_000, "0000764478-14-000011", 2013, "FY", "10-K", "2014-03-28"],
+    ]);
+    expect(labels(facts, "annual")).toEqual(["FY2013", "FY2012T", "FY2011"]);
   });
 
   it("doesn't take an amended 10-K's stray period for a year-end, as at RBC Bearings", () => {

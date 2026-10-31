@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { toSeries, wallClock } from "./chartData";
+import { minBarSpacing, toSeries, wallClock } from "./chartData";
 import type { Bar, Chart } from "./types";
 
 const seconds = (iso: string) => Date.parse(iso) / 1000;
+
+describe("minBarSpacing", () => {
+  it("leaves the chart library's limit alone for a normal chart", () => {
+    expect(minBarSpacing(260)).toBe(0.5);
+    expect(minBarSpacing(0)).toBe(0.5);
+  });
+
+  it("loosens it so a dense series fits a narrow plot", () => {
+    expect(26_000 * minBarSpacing(26_000)).toBeCloseTo(200);
+  });
+});
 
 describe("wallClock", () => {
   it("shows New York's time of day, across the daylight-saving change", () => {

@@ -36,6 +36,9 @@ export interface Bar {
 export const CHART_RANGES = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
 export type ChartRange = (typeof CHART_RANGES)[number];
 
+export const MACRO_RANGES = ["1Y", "5Y", "10Y", "Max"] as const;
+export type MacroRange = (typeof MACRO_RANGES)[number];
+
 export const MOVER_TYPES = ["gainers", "losers", "actives"] as const;
 export type MoverType = (typeof MOVER_TYPES)[number];
 
@@ -89,12 +92,51 @@ export interface Filings {
   filings: Filing[];
 }
 
+export interface Observation {
+  /** As FRED dates it: a day, a week's last day, or the first day of a month, quarter or year. */
+  date: string;
+  value: number;
+}
+
+export interface MacroSeries {
+  id: string;
+  title: string;
+  /** Short form, e.g. "%" or "Index 1982-1984=100". */
+  units: string;
+  /** e.g. "Monthly" or "Weekly, Ending Saturday". */
+  frequency: string;
+  /** FRED's code: "D", "W", "M", "Q", "A", … */
+  frequencyShort: string;
+  /** How many decimals FRED writes the values to. */
+  decimals: number;
+  /** Oldest first. A period with no reading has no entry. */
+  observations: Observation[];
+}
+
+export interface MacroIndicator {
+  id: string;
+  label: string;
+  /** Thousands are shown as "K". */
+  unit: "%" | "K";
+  decimals: number;
+  /** Shows a plus sign: the value is a change. */
+  signed?: boolean;
+  latest: number;
+  prior: number;
+  /** What the latest value covers, e.g. "Sep 2026" or "Q3 2026". */
+  period: string;
+  /** The last two years, oldest first. */
+  trend: number[];
+}
+
 export interface Chart {
   symbol: string;
-  range: ChartRange;
+  range: ChartRange | MacroRange;
   /** Bar size, e.g. "5m", "1d", "1wk". */
   interval: string;
   currency?: string;
+  /** Overrides the decimals that `priceDecimals` picks. */
+  decimals?: number;
   /** The exchange's IANA time zone, for axis labels. */
   timeZone: string;
   /** Where the range starts. Earlier bars are history, so 200-bar averages cover the whole range. */

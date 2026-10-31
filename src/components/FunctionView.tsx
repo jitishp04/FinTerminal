@@ -24,6 +24,14 @@ const FilingsList = dynamic(() => import("./functions/FilingsList").then((m) => 
   ssr: false,
   loading: () => <p className="text-muted">Loading filings…</p>,
 });
+const MacroDashboard = dynamic(() => import("./functions/MacroDashboard").then((m) => m.MacroDashboard), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading indicators…</p>,
+});
+const MacroChart = dynamic(() => import("./functions/MacroChart").then((m) => m.MacroChart), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading chart…</p>,
+});
 const Watchlist =dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
   ssr: false,
   loading: () => <p className="text-muted">Loading watchlist…</p>,
@@ -49,6 +57,9 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   // Keyed so that going from one to the other resets the chosen filter, which belongs to the first.
   if (command.fn === "CF" && command.symbol) return <FilingsList key="CF" symbol={command.symbol} filters={FILING_FILTERS} />;
   if (command.fn === "INS" && command.symbol) return <FilingsList key="INS" symbol={command.symbol} filters={INSIDER_FILTERS} />;
+  if (command.fn === "ECO") {
+    return command.args[0] ? <MacroChart id={command.args[0]} /> : <MacroDashboard onOpen={onOpen} />;
+  }
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;

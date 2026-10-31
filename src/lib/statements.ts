@@ -65,10 +65,20 @@ function combined(a: Values, b: Values, combine: (a: number, b: number) => numbe
 const difference = (a: Values, b: Values) => combined(a, b, (x, y) => x - y);
 const share = (part: Values, whole: Values) => combined(part, whole, (x, y) => (y === 0 ? null : x / y));
 
-/** Where each period's same period a year earlier sits. By name: a missing quarter would throw off a fixed offset. */
+/**
+ * Where each period's same period a year earlier sits. By name: a missing quarter would
+ * throw off a fixed offset. A 10-KT's column compares with nothing, but a year with no
+ * full year before it can compare with that column's 12-month figures. A quarter in a
+ * transition period was numbered on from the year before, so the year in its label is
+ * the one to compare with.
+ */
 function yearAgoIndexes(periods: StatementPeriod[]) {
   const indexes = new Map(periods.map(({ label }, i) => [label, i]));
-  return periods.map(({ label }) => indexes.get(label.replace(/\d+$/, (year) => String(Number(year) - 1))));
+  return periods.map(({ label, transition }) => {
+    if (transition) return label.startsWith("Q") ? indexes.get(label.slice(0, -1)) : undefined;
+    const yearAgo = label.replace(/\d+$/, (year) => String(Number(year) - 1));
+    return indexes.get(yearAgo) ?? (label.startsWith("FY") ? indexes.get(`${yearAgo}T`) : undefined);
+  });
 }
 
 /** Percent change on a year earlier. Blank from a loss or zero, where a percentage means nothing. */

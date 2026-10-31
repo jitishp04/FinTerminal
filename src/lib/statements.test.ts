@@ -78,6 +78,48 @@ describe("year-over-year growth", () => {
     expect(row(statementView(f, "income"), "revenueGrowth").values[0]).toBeCloseTo(20);
   });
 
+  it("is blank on a transition period, and the year after it compares with the last full year", () => {
+    const f = financials(["FY2026", "FY2025T", "FY2025"], { income: [line("revenue", [120, 50, 100])] });
+    f.periods[1].transition = true;
+
+    expect(row(statementView(f, "income"), "revenueGrowth").values).toEqual([20, null, null]);
+  });
+
+  it("compares the year after a transition period with its 12-month figures, as at Compass Minerals", () => {
+    const f = financials(["FY2022", "FY2021T"], { income: [line("revenue", [1_245_200_000, 1_145_400_000])] });
+    f.periods[1].transition = true;
+
+    const growth = row(statementView(f, "income"), "revenueGrowth").values;
+
+    expect(growth[0]).toBeCloseTo(((1_245.2 - 1_145.4) / 1_145.4) * 100, 6);
+    expect(growth[1]).toBeNull();
+  });
+
+  it("compares with a full year over a transition period of that number, even one before it", () => {
+    const f = financials(["FY2024", "FY2023", "FY2023T"], { income: [line("revenue", [120, 100, 40])] });
+    f.periods[2].transition = true;
+
+    expect(row(statementView(f, "income"), "revenueGrowth").values).toEqual([20, null, null]);
+  });
+
+  it("compares a quarter in a transition period with that quarter a year earlier, as at Ferguson", () => {
+    const f = financials(["Q1 FY2025T", "Q1 FY2025"], { income: [line("revenue", [8_169_000_000, 7_772_000_000])] });
+    f.periods[0].transition = true;
+
+    const growth = row(statementView(f, "income"), "revenueGrowth").values;
+
+    expect(growth[0]).toBeCloseTo(((8_169 - 7_772) / 7_772) * 100, 6);
+  });
+
+  it("doesn't compare the new year's quarter with one in a transition period", () => {
+    const f = financials(["Q2 FY2026", "Q1 FY2026", "Q1 FY2025T", "Q2 FY2025"], {
+      income: [line("revenue", [120, 110, 90, 100])],
+    });
+    f.periods[2].transition = true;
+
+    expect(row(statementView(f, "income"), "revenueGrowth").values).toEqual([20, null, null, null]);
+  });
+
   it("is blank when there's nothing meaningful to compare with", () => {
     const f = financials(["FY2026", "FY2025", "FY2024", "FY2023", "FY2022"], {
       income: [line("netIncome", [12, 10, -5, 0, null])],

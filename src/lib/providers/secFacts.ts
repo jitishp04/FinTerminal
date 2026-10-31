@@ -245,6 +245,8 @@ interface FiscalPeriod {
   fiscalYear: number;
   /** 4 for the full year, which also ends Q4. */
   quarter: number;
+  /** The transition period it's part of, which names it instead of `fiscalYear`. */
+  transitionYear?: number;
 }
 
 type ShareBasis = Partial<Record<keyof typeof SHARE_BASIS, number>> & {
@@ -286,7 +288,8 @@ const isPeriodicReport = (fact: Fact) => /^10-[KQ]/.test(fact.form);
 // Not a 10-K/A, which can repeat a year with the wrong dates, as RBC Bearings' does.
 const isFullYearReport = (fact: Fact) => fact.form === "10-K";
 // A transition report closes a year too, but it's the stub left by moving the year-end.
-const isYearEndReport = (fact: Fact) => isFullYearReport(fact) || fact.form === "10-KT";
+const isTransitionReport = (fact: Fact) => fact.form === "10-KT";
+const isYearEndReport = (fact: Fact) => isFullYearReport(fact) || isTransitionReport(fact);
 
 /** How long a fact covers: 0 quarters for a balance, 1 to 4 for a period, undefined for anything else. */
 function quartersSpanned(fact: Fact): number | undefined {
@@ -558,13 +561,26 @@ function placeByDate(filing: Fact, yearEnds: string[], fullYearEnds: string[]) {
 }
 
 /**
+ * The 10-KT a filing is part of: its own, or the one that cut short the year a 10-Q was
+ * counted into. Ferguson's quarter to October 2025 opened a fiscal 2026 that the move to
+ * December ended, so its Q1 would repeat the new year's. A quarter of the year the 10-KT
+ * closes, like Greif's, repeats nothing and has a real year-ago comparison, so it stays.
+ */
+function transitionOf(filing: Fact & { year: number }, yearEndReports: Fact[]) {
+  const closing = yearEndReports.find(({ end }) => end >= filing.end);
+  if (!closing || !isTransitionReport(closing)) return undefined;
+  return isYearEndReport(filing) || filing.year > closingYear(closing.end) ? closing : undefined;
+}
+
+/**
  * Every filing's period by its dates. The fy tags only say how far a company's numbering
  * sits from the calendar: Walmart's year ending January 2026 is FY2026, but Target's is
  * FY2025. A 10-K counts double, as some companies' 10-Qs give the calendar year instead.
  */
 function periodsByDate(filings: Fact[]): FiscalPeriod[] {
   const endsOf = (reports: Fact[]) => reports.map(({ end }) => end);
-  const yearEnds = endsOf(filings.filter(isYearEndReport));
+  const yearEndReports = filings.filter(isYearEndReport);
+  const yearEnds = endsOf(yearEndReports);
   const fullYearEnds = endsOf(filings.filter(isFullYearReport));
   const placed = filings.map((filing) => ({ ...filing, ...placeByDate(filing, yearEnds, fullYearEnds) }));
 
@@ -574,7 +590,15 @@ function periodsByDate(filings: Fact[]): FiscalPeriod[] {
     return isYearEndReport(filing) ? [offset, offset] : [offset];
   });
   const offset = mostCommon(votes.slice(-NUMBERING_VOTES)) ?? 0;
-  return placed.map(({ end, year, quarter }) => ({ end, fiscalYear: year + offset, quarter }));
+  return placed.map((filing) => {
+    const transition = transitionOf(filing, yearEndReports);
+    return {
+      end: filing.end,
+      fiscalYear: filing.year + offset,
+      quarter: filing.quarter,
+      ...(transition && { transitionYear: closingYear(transition.end) + offset }),
+    };
+  });
 }
 
 const periodsByTag = (filings: Fact[]): FiscalPeriod[] =>
@@ -673,7 +697,11 @@ function lineOf({ key, label, unit }: LineSpec, values: (number | null)[]): Stat
 
 const toStatementPeriod =
   (annual: boolean) =>
-  ({ end, fiscalYear, quarter }: FiscalPeriod): StatementPeriod => ({
-    end,
-    label: annual ? `FY${fiscalYear}` : `Q${quarter} FY${fiscalYear}`,
-  });
+  ({ end, fiscalYear, quarter, transitionYear }: FiscalPeriod): StatementPeriod => {
+    if (transitionYear === undefined) {
+      return { end, label: annual ? `FY${fiscalYear}` : `Q${quarter} FY${fiscalYear}` };
+    }
+    const year = `FY${transitionYear}T`;
+    // A 10-KT's own period can run from a month to most of a year, so it isn't a Q4 in either view.
+    return { end, label: annual || quarter === 4 ? year : `Q${quarter} ${year}`, transition: true };
+  };

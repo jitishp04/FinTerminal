@@ -2,9 +2,7 @@
 
 import {
   CandlestickSeries,
-  ColorType,
   createChart,
-  CrosshairMode,
   HistogramSeries,
   LineSeries,
   type IChartApi,
@@ -15,6 +13,7 @@ import { useEffect, useRef } from "react";
 import { minBarSpacing, OVERLAYS, toSeries, type Overlay } from "@/lib/chartData";
 import { priceDecimals } from "@/lib/format";
 import type { Chart } from "@/lib/types";
+import { chartLook, cssColor as color } from "./chartLook";
 
 export type ChartStyle = "Candles" | "Line";
 
@@ -43,21 +42,11 @@ export function CandleChart({ data, style, overlays }: { data: Chart; style: Cha
   const fitted = useRef("");
 
   useEffect(() => {
-    const css = getComputedStyle(document.documentElement);
-    const color = (name: string) => css.getPropertyValue(name).trim();
     const [up, down, border] = [color("--up"), color("--down"), color("--border")];
 
     const chart = createChart(container.current!, {
+      ...chartLook(),
       autoSize: true,
-      // attributionLogo stays on (the default): the license asks for a link to TradingView.
-      layout: {
-        background: { type: ColorType.Solid, color: color("--background") },
-        textColor: color("--muted"),
-        fontFamily: getComputedStyle(document.body).fontFamily,
-        fontSize: 11,
-      },
-      grid: { vertLines: { color: border }, horzLines: { color: border } },
-      crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: border, scaleMargins: { top: 0.08, bottom: 0.25 } },
       timeScale: { borderColor: border, lockVisibleTimeRangeOnResize: true },
     });

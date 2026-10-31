@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import { clearCache } from "../cache";
+import { TENORS } from "../curve";
 import { INDICATORS } from "../macro";
-import { dashboard, series } from "./fred";
+import { curve, dashboard, series } from "./fred";
 
 const KEY = "0123456789abcdef0123456789abcdef";
 
@@ -202,5 +203,40 @@ describe("dashboard", () => {
   it("asks for a key rather than failing a row at a time", async () => {
     vi.stubEnv("FRED_API_KEY", "");
     expect(await rejection(dashboard())).toMatchObject({ status: 401 });
+  });
+});
+
+describe("curve", () => {
+  const history = {
+    observations: [
+      { date: "2025-10-29", value: "3.50" },
+      { date: "2026-09-29", value: "4.00" },
+      { date: "2026-10-12", value: "." },
+      { date: "2026-10-29", value: "4.50" },
+    ],
+  };
+
+  it("gives every tenor, from one request each", async () => {
+    const fetchStub = stubFred(INFO, history);
+    const { dates, points } = await curve();
+    expect(dates.latest).toBe("2026-10-29");
+    expect(points.map(({ tenor }) => tenor)).toEqual(TENORS.map(({ label }) => label));
+    expect(points[0]).toMatchObject({ latest: 4.5, monthAgo: 4, yearAgo: 3.5 });
+    expect(fetchStub).toHaveBeenCalledTimes(TENORS.length);
+    expect(fetchStub.mock.calls.map(([url]) => new URL(url).searchParams.get("series_id"))).toEqual(
+      TENORS.map(({ id }) => id),
+    );
+  });
+
+  it("shares a tenor's observations with its chart", async () => {
+    const fetchStub = stubFred(INFO, history);
+    await curve();
+    await series("DGS10");
+    expect(fetchStub).toHaveBeenCalledTimes(TENORS.length + 1);
+  });
+
+  it("asks for a key", async () => {
+    vi.stubEnv("FRED_API_KEY", "");
+    expect(await rejection(curve())).toMatchObject({ status: 401 });
   });
 });

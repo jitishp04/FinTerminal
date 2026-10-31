@@ -3,6 +3,7 @@ import {
   formatIndicator,
   INDICATORS,
   monthlyChange,
+  monthsBefore,
   periodLabel,
   sparkPoints,
   toChart,
@@ -32,6 +33,26 @@ const CPI = points({
   "2026-09-01": 110,
   "2026-10-01": 111,
   "2026-11-01": 113.4,
+});
+
+describe("monthsBefore", () => {
+  it.each([
+    ["2026-10-29", 1, "2026-09-29"],
+    ["2026-10-29", 12, "2025-10-29"],
+    ["2026-01-15", 1, "2025-12-15"],
+    ["2026-03-01", 12, "2025-03-01"],
+  ])("takes %s back to the same day: %i month(s)", (date, months, expected) => {
+    expect(monthsBefore(date, months)).toBe(expected);
+  });
+
+  it.each([
+    ["2026-03-31", 1, "2026-02-28"],
+    ["2024-03-31", 1, "2024-02-29"],
+    ["2026-10-31", 1, "2026-09-30"],
+    ["2024-02-29", 12, "2023-02-28"],
+  ])("stops at the end of a shorter month: %s less %i", (date, months, expected) => {
+    expect(monthsBefore(date, months)).toBe(expected);
+  });
 });
 
 describe("yearOverYear", () => {

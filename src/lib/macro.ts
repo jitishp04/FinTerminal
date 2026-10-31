@@ -16,10 +16,11 @@ function yearsBefore(date: string, years: number): number {
   return Date.UTC(year - years, month - 1, day) / 1000;
 }
 
-/** FRED dates a month by its first day, so `"2026-01-01"` less one month is `"2025-12-01"`. */
-function monthsBefore(date: string, months: number): string {
-  const [year, month] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1 - months, 1)).toISOString().slice(0, 10);
+/** The same day `months` earlier, or that month's last day if it's shorter: a month before 31 March is 28 February. */
+export function monthsBefore(date: string, months: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month - months, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month - 1 - months, Math.min(day, lastDay))).toISOString().slice(0, 10);
 }
 
 /**

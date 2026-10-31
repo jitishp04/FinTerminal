@@ -88,6 +88,14 @@ const plainYear = (year: number, shares: number, eps: number): Column => ({
   netIncome: shares * eps,
 });
 
+/** A company from `reports`, where the report filed on `filed` states a split's ratio in the SEC's own tag. */
+const stating = (reports: Record<string, Column[]>, filed: string, val: number) => {
+  const stated: Fact = { end: filed, val, accn: filed, fy: Number(filed.slice(0, 4)), fp: "Q3", form: "10-Q", filed };
+  const company = filings(reports);
+  const gaap = { ...company.facts["us-gaap"], StockholdersEquityNoteStockSplitConversionRatio1: { units: { pure: [stated] } } };
+  return { ...company, facts: { "us-gaap": gaap } };
+};
+
 const perShare = (facts: unknown, year: number) => {
   const annual = statements(facts, "annual");
   return {
@@ -989,6 +997,117 @@ describe("stock splits", () => {
       expect(perShare(facts, 2025).shares).toBe(33_190_200);
       expect(perShare(facts, 2025).eps).toBeCloseTo(-6.1, 6);
       expect(quarterly(facts, "sharesDiluted", "Q2 FY2026")).toBe(128_085_000);
+    });
+
+    it("reads a split a merger hides from the filing that states it, as at Sirius XM", () => {
+      // Liberty's merger came with the 1-for-10, so 3,865,000,000 became 339,000,000 and not 386,500,000, and
+      // $906M became $614M. No comparison shows a split, but the 10-Q states 0.1. FY2021 was last filed before
+      // it: 4,143,000,000 / 10 is 414,300,000, and $0.32 × 10 is $3.20. FY2023 is on the new basis already.
+      const facts = stating(
+        {
+          "2022-02-01": [{ year: 2021, basic: 4_062_000_000, diluted: 4_143_000_000, epsBasic: 0.32, epsDiluted: 0.32, netIncome: 1_314_000_000 }],
+          "2023-10-31": [{ year: 2023, quarter: 3, toDate: true, basic: 3_865_000_000, diluted: 3_884_000_000, epsBasic: 0.23, epsDiluted: 0.23, netIncome: 906_000_000 }],
+          "2024-02-01": [{ year: 2023, basic: 3_858_000_000, diluted: 3_888_000_000, epsBasic: 0.33, epsDiluted: 0.32, netIncome: 1_258_000_000 }],
+          "2024-10-31": [{ year: 2023, quarter: 3, toDate: true, basic: 339_000_000, diluted: 360_000_000, epsBasic: 2.24, epsDiluted: 2.12, netIncome: 614_000_000 }],
+          "2025-01-30": [{ year: 2023, basic: 339_000_000, diluted: 362_000_000, epsBasic: 2.91, epsDiluted: 2.77, netIncome: 786_000_000 }],
+        },
+        "2024-10-31",
+        0.1,
+      );
+      expect(perShare(facts, 2021).shares).toBeCloseTo(414_300_000, 0);
+      expect(perShare(facts, 2021).eps).toBeCloseTo(3.2, 6);
+      expect(perShare(facts, 2023)).toEqual({ eps: 2.77, shares: 362_000_000 });
+    });
+
+    it("reads a stated ratio as the split it rounds, as at Herc", () => {
+      // Hertz's spin-off restated income, and the 10-Q states 0.0667 for a 1-for-15. FY2013 was last filed before
+      // it: 464,000,000 / 15 is 30,933,333, where 0.0667 would give 30,948,800, and $0.67 × 15 is $10.05.
+      const facts = stating(
+        {
+          "2015-11-09": [{ year: 2015, quarter: 2, toDate: true, basic: 459_000_000, diluted: 459_000_000, epsBasic: -0.07, epsDiluted: -0.07, profit: -34_000_000 }],
+          "2016-02-29": [{ year: 2013, basic: 422_000_000, diluted: 464_000_000, epsBasic: 0.72, epsDiluted: 0.67, profit: 302_000_000 }],
+          "2016-08-09": [{ year: 2015, quarter: 2, toDate: true, basic: 30_600_000, diluted: 30_600_000, epsBasic: 0.4, epsDiluted: 0.4, netIncome: 12_300_000 }],
+        },
+        "2016-08-09",
+        0.0667,
+      );
+      expect(perShare(facts, 2013).shares).toBeCloseTo(464_000_000 / 15, 0);
+      expect(perShare(facts, 2013).eps).toBeCloseTo(10.05, 6);
+    });
+
+    it("doesn't take a ratio stated in another filing for a merger's split, as at Palvella", () => {
+      // The 10-K states Pieris's merger ratio of 2.27, and the next 10-Q moves the shell's Q1 2014 by 2.37. A merger's
+      // ratio isn't a split, and that 10-Q doesn't say it is, so the shell's count stays as filed.
+      const facts = stating(
+        {
+          "2014-06-02": [{ year: 2014, quarter: 1, basic: 5_000_000, epsBasicAndDiluted: 0, netIncome: -1_544 }],
+          "2014-12-12": [{ year: 2013, quarter: 3, basicAndDiluted: 6_100_000, epsBasicAndDiluted: 0, netIncome: -5_762 }],
+          "2015-05-14": [{ year: 2014, quarter: 1, basicAndDiluted: 11_828_974, epsBasicAndDiluted: -0.07, netIncome: -779_905 }],
+        },
+        "2015-03-30",
+        2.272727,
+      );
+      expect(quarterly(facts, "sharesDiluted", "Q3 FY2013")).toBe(6_100_000);
+    });
+
+    it("doesn't take a stated ratio the counts didn't move by, as at Riley Permian", () => {
+      // The 10-K shows the 1-for-12. The next 10-Q states 83 for it, or 8.3%, where Riley's history moved Q1 2020 by
+      // 1.168, or 14 once the split comes out. That's near neither, so FY2020 stays as filed, already on the new basis.
+      const facts = stating(
+        {
+          "2020-03-30": [{ year: 2019, basic: 10_651_342, diluted: 10_651_342, netIncome: -436_000 }],
+          "2020-05-14": [{ year: 2020, quarter: 1, basic: 10_666_129, diluted: 10_666_129, epsBasicAndDiluted: -0.05, netIncome: -527_000 }],
+          "2021-03-30": [
+            { year: 2019, basic: 887_612, diluted: 887_612, epsBasic: -0.49, epsDiluted: -0.49, netIncome: -436_000 },
+            { year: 2020, basic: 889_670, diluted: 889_670, epsBasic: -4.1, epsDiluted: -4.1, netIncome: -3_648_000 },
+          ],
+          "2021-05-17": [{ year: 2020, quarter: 1, basic: 12_457_273, diluted: 16_486_275, epsBasic: 5.95, epsDiluted: 4.55, netIncome: 75_053_000 }],
+        },
+        "2021-05-17",
+        83,
+      );
+      expect(perShare(facts, 2020)).toEqual({ eps: -4.1, shares: 889_670 });
+    });
+
+    it("doesn't read what's left of a merger's move as another split", () => {
+      // The merger's 10-K states 0.1 where counts moved by 0.084. The next one compares across it, also by 0.084, and
+      // with the 1-for-10 out that leaves 0.84, which looks like a 5-for-6 of its own. FY2019 only takes the 1-for-10.
+      const facts = stating(
+        {
+          "2020-03-01": [plainYear(2019, 100_000_000, 1)],
+          "2021-03-01": [plainYear(2020, 100_000_000, 1)],
+          "2022-03-01": [plainYear(2021, 100_000_000, 1)],
+          "2023-03-01": [plainYear(2021, 8_400_000, 5)],
+          "2024-03-01": [plainYear(2020, 8_400_000, 11.9)],
+        },
+        "2023-03-01",
+        0.1,
+      );
+      expect(perShare(facts, 2019).shares).toBeCloseTo(10_000_000, 0);
+    });
+
+    it("doesn't count a split twice when a later filing states it again, as at AGNT", () => {
+      // The 10-K shows the 2-for-1: Q3 2020's 69,256,733 became 140,754,887 and EPS halved. The next 10-Q tags a year
+      // to date with income moved and states 2 again, but its 2.135 is only 1.07 once the split comes out. FY2019 is
+      // as first filed, leaving out the 10-K's own restated year: 62,585,555 × 2 is 125,171,110, and -$0.15 / 2 is -$0.075.
+      const facts = stating(
+        {
+          "2020-03-12": [{ year: 2019, basic: 62_585_555, diluted: 62_585_555, epsBasic: -0.15, epsDiluted: -0.15, netIncome: -9_527_714 }],
+          "2020-11-09": [
+            { year: 2020, quarter: 3, toDate: true, basic: 67_603_551, diluted: 73_548_056, epsBasic: 0.35, epsDiluted: 0.32, netIncome: 23_410_000 },
+            { year: 2020, quarter: 3, basic: 69_256_733, diluted: 75_653_407, epsBasic: 0.22, epsDiluted: 0.2, netIncome: 14_970_000 },
+          ],
+          "2021-03-11": [
+            { year: 2020, quarter: 3, basic: 140_754_887, diluted: 153_548_236, epsBasic: 0.1, epsDiluted: 0.1, profit: 14_918_000 },
+            { year: 2020, quarter: 4, basic: 143_026_018, diluted: 156_543_876, epsBasic: 0.05, epsDiluted: 0.05, profit: 7_696_000 },
+          ],
+          "2021-05-06": [{ year: 2020, quarter: 3, toDate: true, basic: 144_354_991, diluted: 158_722_126, epsBasic: 0.03, epsDiluted: 0.03, netIncome: 4_846_000 }],
+        },
+        "2021-05-06",
+        2,
+      );
+      expect(perShare(facts, 2019).shares).toBe(125_171_110);
+      expect(perShare(facts, 2019).eps).toBeCloseTo(-0.075, 6);
     });
   });
 });

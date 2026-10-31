@@ -240,6 +240,10 @@ const EPS_ROUNDING = 0.005;
 const SMALLEST_TELLING_EPS = 0.25;
 // EPS can be restated by less than this for other reasons, while income stays the same.
 const SMALLEST_SPLIT_FROM_EPS_ALONE = 2;
+/** The SEC's tag for a split's ratio, which filers also use for stock dividends and conversions. */
+const STATED_SPLIT_TAG = "StockholdersEquityNoteStockSplitConversionRatio1";
+// A merger's shares can keep the counts this far from a split that came with it: 12% at Sirius XM.
+const STATED_SPLIT_TOLERANCE = 0.2;
 
 /** A count in the wrong scale is off by a power of this: thousands, millions, or three zeros too many. */
 const SCALE_STEP = 1000;
@@ -547,6 +551,25 @@ function firstOnNewBasis(counts: OwnCount[], older: ShareBasis, newer: ShareBasi
 }
 
 /**
+ * A split that came with a filing replacing a company's history, as Sirius XM's did with
+ * Liberty's merger. The merger's shares keep the counts off an exact ratio, so it takes
+ * that filing's own word, and counts that moved close to it, as filers state other ratios
+ * too: Riley's 83 is its one-twelfth, and AGNT's 2 is a split already known.
+ */
+function statedSplit(gaap: Gaap, filing: Restatement[], splits: StockSplit[]): StockSplit | undefined {
+  for (const { older, newer, ratios } of filing) {
+    const moved = ratios[0] / sharesPerShare(splits, older.filed, newer.filed);
+    for (const { accn, val } of gaap[STATED_SPLIT_TAG]?.units.pure ?? []) {
+      const factor = splitFactor(val);
+      if (accn === newer.accn && factor && Math.abs(moved / factor - 1) <= STATED_SPLIT_TOLERANCE) {
+        return { filed: newer.filed, factor };
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
  * A company's splits, from its own restatements. Later filings repeat a past period
  * on the new basis, which shows a split's size and when it reached the filings. A jump
  * from one period to the next shows neither, as a merger makes one too. The evidence is
@@ -556,7 +579,8 @@ function firstOnNewBasis(counts: OwnCount[], older: ShareBasis, newer: ShareBasi
  * earlier filings come out first, as one restatement can span two of them.
  *
  * Once a filing replaces a company's history, nothing filed before it says anything about
- * what's filed after, however close later figures happen to come.
+ * what's filed after, however close later figures happen to come. Only that filing can
+ * say a split came with it.
  */
 function stockSplits(gaap: Gaap): StockSplit[] {
   const counts = ownCounts(gaap);
@@ -566,6 +590,8 @@ function stockSplits(gaap: Gaap): StockSplit[] {
     const comparable = restated.filter(({ older }) => older.filed >= replaced);
     if (replacesHistory(comparable)) {
       replaced = restated[0].newer.filed;
+      const stated = statedSplit(gaap, comparable, splits);
+      if (stated) splits.push(stated);
       continue;
     }
     for (const { older, newer, ratios } of comparable) {

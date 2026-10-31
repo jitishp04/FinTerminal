@@ -23,6 +23,8 @@ const FACTS = {
 
 const SUBMISSIONS = {
   name: "Apple Inc.",
+  insiderTransactionForIssuerExists: 1,
+  insiderTransactionForOwnerExists: 0,
   filings: {
     recent: {
       accessionNumber: ["0001-26-000001", "0000320193-25-000079", "0000320193-25-000050", "0001-25-000002"],
@@ -30,7 +32,6 @@ const SUBMISSIONS = {
       reportDate: ["2026-10-27", "2025-09-27", "", "2025-06-28"],
       form: ["4", "10-K", "10-K/A", "10-Q"],
       primaryDocument: ["xslF345X06/form4.xml", "aapl-20250927.htm", "amend.htm", "aapl-q3.htm"],
-      primaryDocDescription: ["FORM 4", "10-K", "", "10-Q"],
     },
   },
 };
@@ -179,7 +180,6 @@ describe("filings", () => {
       form: "10-K",
       filed: "2025-10-31",
       reportDate: "2025-09-27",
-      description: "10-K",
       url: "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
     });
   });
@@ -190,11 +190,34 @@ describe("filings", () => {
     expect(result.filings.map((filing) => filing.form)).toEqual(["10-K", "10-K/A"]);
   });
 
-  it("fills in what the SEC leaves blank", async () => {
+  it("leaves a date the SEC doesn't give empty", async () => {
     const amended = (await filings("AAPL", ["10-K"])).filings[1];
 
     expect(amended.reportDate).toBeNull();
-    expect(amended.description).toBe("10-K/A");
+  });
+
+  it("leaves out a company's insider forms when it has no insiders of its own: they're about stock it holds elsewhere", async () => {
+    stubSec({
+      company_tickers: TICKERS,
+      "submissions/CIK0000320193.json": { ...SUBMISSIONS, insiderTransactionForIssuerExists: 0, insiderTransactionForOwnerExists: 1 },
+    });
+
+    expect((await filings("AAPL", ["4"])).filings).toEqual([]);
+    expect((await filings("AAPL", ["10-K"])).filings).toHaveLength(2);
+  });
+
+  it("says when a company's insider forms may be about stock it holds elsewhere", async () => {
+    expect((await filings("AAPL", ["4"])).filesAsHolder).toBe(false);
+
+    clearCache();
+    stubSec({
+      company_tickers: TICKERS,
+      "submissions/CIK0000320193.json": { ...SUBMISSIONS, insiderTransactionForOwnerExists: 1 },
+    });
+
+    const mixed = await filings("AAPL", ["4"]);
+    expect(mixed.filesAsHolder).toBe(true);
+    expect(mixed.filings).toHaveLength(1);
   });
 
   it("caps a long list, so a heavy filer's thousands of notes can't flood a response", async () => {
@@ -211,7 +234,6 @@ describe("filings", () => {
             reportDate: form.map(() => ""),
             form,
             primaryDocument: form.map(() => "note.htm"),
-            primaryDocDescription: form.map(() => ""),
           },
         },
       },

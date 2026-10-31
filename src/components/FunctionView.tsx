@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { commandTitle, type Command } from "@/lib/commands";
+import { FILING_FILTERS, INSIDER_FILTERS } from "@/lib/filings";
 import { FUNCTION_BY_CODE } from "@/lib/functions";
 import { MONITORS } from "@/lib/monitors";
 import { Help } from "./functions/Help";
@@ -19,7 +20,11 @@ const FinancialStatements = dynamic(
   () => import("./functions/FinancialStatements").then((m) => m.FinancialStatements),
   { ssr: false, loading: () => <p className="text-muted">Loading statements…</p> },
 );
-const Watchlist = dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
+const FilingsList = dynamic(() => import("./functions/FilingsList").then((m) => m.FilingsList), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading filings…</p>,
+});
+const Watchlist =dynamic(() => import("./functions/Watchlist").then((m) => m.Watchlist), {
   ssr: false,
   loading: () => <p className="text-muted">Loading watchlist…</p>,
 });
@@ -41,6 +46,9 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
   if (command.fn === "FA" && command.symbol) return <FinancialStatements symbol={command.symbol} />;
+  // Keyed so that going from one to the other resets the chosen filter, which belongs to the first.
+  if (command.fn === "CF" && command.symbol) return <FilingsList key="CF" symbol={command.symbol} filters={FILING_FILTERS} />;
+  if (command.fn === "INS" && command.symbol) return <FilingsList key="INS" symbol={command.symbol} filters={INSIDER_FILTERS} />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;

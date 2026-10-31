@@ -75,15 +75,16 @@ export interface Filing {
   form: string;
   /** Date filed, e.g. "2025-10-31". */
   filed: string;
-  /** Date the filing covers, if it has one. */
+  /** The date the form gives: a period's end, an event, an insider's trade, a proxy's meeting. */
   reportDate: string | null;
-  description: string;
   url: string;
 }
 
 export interface Filings {
   symbol: string;
   name: string;
+  /** It also files insider forms as a large holder of other companies' stock, so one here can be about them. */
+  filesAsHolder: boolean;
   /** Newest first. */
   filings: Filing[];
 }

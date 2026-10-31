@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchApi, FetchError } from "@/lib/fetchApi";
+import { fetchApi } from "@/lib/fetchApi";
 import { keyStats } from "@/lib/keyStats";
 import {
   formatCell,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/statements";
 import { FINANCIAL_PERIODS, type FinancialPeriod, type Financials, type Profile } from "@/lib/types";
 import { QuoteLine } from "./QuoteLine";
+import { SourceError } from "./SourceError";
 import { Toggle } from "./Toggle";
 import { useProfile } from "./useProfile";
 
@@ -69,7 +70,9 @@ export function FinancialStatements({ symbol }: { symbol: string }) {
           Loading statements…
         </p>
       )}
-      {financials.isError && <StatementsError error={financials.error} type={profile.data?.type} />}
+      {financials.isError && (
+        <SourceError error={financials.error} notAvailable={notAvailableMessage(profile.data?.type)} />
+      )}
       {financials.data && <Statement financials={financials.data} tab={tab} />}
     </div>
   );
@@ -86,22 +89,6 @@ function Ratios({ profile }: { profile: Profile }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function StatementsError({ error, type }: { error: Error; type: string | undefined }) {
-  // "Not available" is an answer, not a failure, so it doesn't read as an alarm.
-  if (error instanceof FetchError && error.status === 404) {
-    return (
-      <p role="status" className="text-muted">
-        {notAvailableMessage(type) ?? error.message}
-      </p>
-    );
-  }
-  return (
-    <p role="alert" className="text-down">
-      {error.message}
-    </p>
   );
 }
 

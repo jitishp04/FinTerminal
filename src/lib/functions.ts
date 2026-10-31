@@ -52,8 +52,8 @@ export const FUNCTIONS: FunctionDef[] = [
   },
   {
     code: "INS",
-    title: "Insider trades",
-    description: "Shares bought and sold by executives and directors",
+    title: "Insider filings",
+    description: "Forms 3, 4 and 5 filed by executives and directors",
     keywords: ["insiders", "insider trading", "form 4"],
     group: "Security",
     symbol: "required",

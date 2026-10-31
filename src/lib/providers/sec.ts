@@ -1,5 +1,6 @@
 import { ApiError } from "../api";
 import { cached } from "../cache";
+import { baseForm, isInsiderForm } from "../filings";
 import type { Filing, FinancialPeriod, Financials, Filings } from "../types";
 import { toFinancials, type CompanyFacts } from "./secFacts";
 
@@ -23,6 +24,10 @@ interface Company {
 }
 
 interface Submissions {
+  /** 1 if insiders file forms about this company's own stock. */
+  insiderTransactionForIssuerExists: number;
+  /** 1 if it files those forms itself, as a large holder of other companies' stock. */
+  insiderTransactionForOwnerExists: number;
   filings: {
     /** Parallel arrays, newest first, covering at least the last year. */
     recent: {
@@ -31,7 +36,6 @@ interface Submissions {
       reportDate: string[];
       form: string[];
       primaryDocument: string[];
-      primaryDocDescription: string[];
     };
   };
 }
@@ -86,14 +90,19 @@ export async function financials(symbol: string, period: FinancialPeriod): Promi
   return { symbol, ...found };
 }
 
-function toFilings(cik: number, { filings: { recent } }: Submissions): Filing[] {
-  return recent.form.map((form, i) => ({
+function toFilings(cik: number, submissions: Submissions) {
+  const { recent } = submissions.filings;
+  const filings: Filing[] = recent.form.map((form, i) => ({
     form,
     filed: recent.filingDate[i],
     reportDate: recent.reportDate[i] || null,
-    description: recent.primaryDocDescription[i] || form,
     url: `${WWW}/Archives/edgar/data/${cik}/${recent.accessionNumber[i].replaceAll("-", "")}/${recent.primaryDocument[i]}`,
   }));
+  return {
+    // With no insiders of its own, its insider forms are about stock it holds elsewhere: Shopify's are all Klaviyo and Affirm.
+    filings: submissions.insiderTransactionForIssuerExists ? filings : filings.filter(({ form }) => !isInsiderForm(form)),
+    filesAsHolder: submissions.insiderTransactionForOwnerExists === 1,
+  };
 }
 
 /** Filings from about the last year or more, newest first. `forms` narrows it, and an amendment counts as its form. */
@@ -102,12 +111,13 @@ export async function filings(symbol: string, forms: string[]): Promise<Filings>
   const company = (await companies()).get(symbol);
   if (!company) throw notAvailable;
 
-  const all = await cached(`sec:filings:${company.cik}`, FILINGS_TTL, async () => {
+  const found = await cached(`sec:filings:${company.cik}`, FILINGS_TTL, async () => {
     const submissions = await request<Submissions>(`${DATA}/submissions/CIK${paddedCik(company.cik)}.json`);
     return submissions && toFilings(company.cik, submissions);
   });
-  if (!all) throw notAvailable;
+  if (!found) throw notAvailable;
 
-  const wanted = forms.length > 0 ? all.filter(({ form }) => forms.includes(form.replace(/\/A$/, ""))) : all;
-  return { symbol, name: company.name, filings: wanted.slice(0, MAX_FILINGS) };
+  const { filings: all, filesAsHolder } = found;
+  const wanted = forms.length > 0 ? all.filter(({ form }) => forms.includes(baseForm(form))) : all;
+  return { symbol, name: company.name, filesAsHolder, filings: wanted.slice(0, MAX_FILINGS) };
 }

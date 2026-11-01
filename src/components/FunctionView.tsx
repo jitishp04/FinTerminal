@@ -27,6 +27,10 @@ const DcaBacktest = dynamic(() => import("./functions/DcaBacktest").then((m) => 
   ssr: false,
   loading: () => <p className="text-muted">Loading price history…</p>,
 });
+const DcfValuation = dynamic(() => import("./functions/DcfValuation").then((m) => m.DcfValuation), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading filings and prices…</p>,
+});
 const MacroDashboard = dynamic(() => import("./functions/MacroDashboard").then((m) => m.MacroDashboard), {
   ssr: false,
   loading: () => <p className="text-muted">Loading indicators…</p>,
@@ -69,6 +73,7 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "CF" && command.symbol) return <FilingsList key="CF" symbol={command.symbol} filters={FILING_FILTERS} />;
   if (command.fn === "INS" && command.symbol) return <FilingsList key="INS" symbol={command.symbol} filters={INSIDER_FILTERS} />;
   if (command.fn === "DCA" && command.symbol) return <DcaBacktest symbol={command.symbol} />;
+  if (command.fn === "DCF" && command.symbol) return <DcfValuation symbol={command.symbol} />;
   if (command.fn === "ECO") {
     return command.args[0] ? <MacroChart id={command.args[0]} /> : <MacroDashboard onOpen={onOpen} />;
   }

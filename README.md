@@ -33,8 +33,8 @@ Everything is free and none of it needs a credit card. Quotes and charts work wi
 
 | Setting | Unlocks | How to get it |
 |---|---|---|
-| `SEC_USER_AGENT` | `FA`, `CF`, `INS` | No signup. The SEC asks automated users to identify themselves, so enter your name and email, for example `FinTerminal Jane Doe jane@example.com`. |
-| `FRED_API_KEY` | `ECO`, `CURV` | Create a free account at [fredaccount.stlouisfed.org](https://fredaccount.stlouisfed.org/apikeys), then request a key. |
+| `SEC_USER_AGENT` | `FA`, `CF`, `INS`, `DCF` | No signup. The SEC asks automated users to identify themselves, so enter your name and email, for example `FinTerminal Jane Doe jane@example.com`. |
+| `FRED_API_KEY` | `ECO`, `CURV`, `DCF` | Create a free account at [fredaccount.stlouisfed.org](https://fredaccount.stlouisfed.org/apikeys), then request a key. |
 | `FINNHUB_API_KEY` | A backup for US stock quotes when Yahoo fails | Register at [finnhub.io](https://finnhub.io/register) and copy the key from your dashboard. Optional. |
 
 The running server picks up a new key by itself. Reload the page afterwards.
@@ -51,6 +51,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `<SYM> CF` | SEC filings |
 | `<SYM> INS` | Insider filings: Forms 3, 4 and 5 |
 | `<SYM> DCA` | Dollar-cost averaging backtest: every schedule against a lump sum |
+| `<SYM> DCF` | DCF valuation: a range of values per share, with every assumption shown |
 | `W` | Your watchlist |
 | `WEI` | World indices |
 | `SECT` | Sector heatmap |

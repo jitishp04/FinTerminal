@@ -253,6 +253,16 @@ describe("which number wins", () => {
     expect(value(statements(facts, "annual"), "balance", "shortTermInvestments", "FY2025")).toBe(12);
   });
 
+  it("reads the current portion of long-term debt, with or without leases", () => {
+    // Microsoft's 10-Q for the quarter to 30 September 2026, and Coca-Cola's tag that includes finance leases.
+    const sales = company("Revenues", [["2026-07-01", "2026-09-30", 92_279_000_000, "q", 2027, "Q1", "10-Q", "2026-10-28"]]);
+    for (const tag of ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent"]) {
+      const due = company(tag, [[undefined, "2026-09-30", 4_391_000_000, "q", 2027, "Q1", "10-Q", "2026-10-28"]]);
+      const facts = { entityName: "Test Co", facts: { "us-gaap": { ...sales.facts["us-gaap"], ...due.facts["us-gaap"] } } };
+      expect(value(statements(facts, "quarterly"), "balance", "currentDebt", "Q1 FY2027")).toBe(4_391_000_000);
+    }
+  });
+
   it("reads total revenue ahead of contract revenue, which leaves out an insurer's premiums", () => {
     const contract = company("RevenueFromContractWithCustomerExcludingAssessedTax", [["2025-01-01", "2025-12-31", 247, "a", 2025, "FY", "10-K", "2026-02-01"]]);
     const total = company("Revenues", [["2025-01-01", "2025-12-31", 370, "a", 2025, "FY", "10-K", "2026-02-01"]]);

@@ -3,7 +3,7 @@ import { ApiError } from "../api";
 import { clearCache } from "../cache";
 import { TENORS } from "../curve";
 import { INDICATORS } from "../macro";
-import { curve, dashboard, series } from "./fred";
+import { curve, dashboard, latest, series } from "./fred";
 
 const KEY = "0123456789abcdef0123456789abcdef";
 
@@ -242,5 +242,17 @@ describe("curve", () => {
   it("asks for a key", async () => {
     vi.stubEnv("FRED_API_KEY", "");
     expect(await rejection(curve())).toMatchObject({ status: 401 });
+  });
+});
+
+describe("latest", () => {
+  it("gives the newest reading, skipping days with none", async () => {
+    stubFred(INFO, { observations: [{ date: "2026-10-28", value: "4.10" }, { date: "2026-10-29", value: "4.12" }, { date: "2026-10-30", value: "." }] });
+    expect(await latest("DGS10")).toEqual({ date: "2026-10-29", value: 4.12 });
+  });
+
+  it("asks for a key", async () => {
+    vi.stubEnv("FRED_API_KEY", "");
+    expect(await rejection(latest("DGS10"))).toMatchObject({ status: 401 });
   });
 });

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, history, movers, news, options, profile, quote, screen, sessionStart } from "./yahoo";
+import { chart, history, movers, news, options, profile, quote, screen, sessionStart, weekly } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn(), options: vi.fn() }));
 
@@ -318,6 +318,48 @@ describe("history", () => {
   it("answers an unknown symbol with a 404", async () => {
     yahoo.chart.mockRejectedValue(new Error("No data found, symbol may be delisted"));
     await expect(history("ZZZZ")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("weekly", () => {
+  // In Stockholm, where a Monday's bar can land on the Sunday in UTC.
+  const VOLVO = {
+    meta: { symbol: "VOLV-B.ST", currency: "SEK", exchangeTimezoneName: "Europe/Stockholm" },
+    quotes: [
+      bar("2026-10-25T23:00:00Z", 300, { high: 305, low: 295, volume: 10 }),
+      bar("2026-10-30T07:00:00Z", 310, { high: 320, low: 299, volume: 20 }),
+      bar("2026-11-02T08:00:00Z", 305, { volume: 30 }),
+      bar("2026-11-03T08:00:00Z", null),
+    ],
+  };
+
+  it("asks for every day since 1970, in the regular session", async () => {
+    yahoo.chart.mockResolvedValue(VOLVO);
+
+    await weekly("VOLV-B.ST");
+
+    const [[symbol, options]] = yahoo.chart.mock.calls;
+    expect(symbol).toBe("VOLV-B.ST");
+    expect(options).toEqual({ period1: new Date(0), interval: "1d", includePrePost: false });
+  });
+
+  it("makes weeks of the days, by the date on the exchange", async () => {
+    yahoo.chart.mockResolvedValue(VOLVO);
+
+    expect(await weekly("VOLV-B.ST")).toEqual({
+      symbol: "VOLV-B.ST",
+      currency: "SEK",
+      weeks: [
+        { time: Date.UTC(2026, 9, 26) / 1000, open: 300, high: 320, low: 295, close: 310, volume: 30 },
+        { time: Date.UTC(2026, 10, 2) / 1000, open: 305, high: 305, low: 305, close: 305, volume: 30 },
+      ],
+    });
+  });
+
+  it("answers 404 for a symbol Yahoo doesn't know", async () => {
+    yahoo.chart.mockRejectedValue(new Error("No data found, symbol may be delisted"));
+
+    await expect(weekly("ZZZZ")).rejects.toMatchObject({ status: 404, message: "No data for ZZZZ" });
   });
 });
 

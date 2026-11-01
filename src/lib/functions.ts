@@ -78,6 +78,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "MSFT DCF",
   },
   {
+    code: "THS",
+    title: "Thesis check",
+    description: "Weekly trend, strength against the market, Bollinger Bands, RSI and buy signals",
+    keywords: ["thesis", "thesis check", "40-week line", "bollinger", "rsi", "buy signals", "technicals"],
+    group: "Security",
+    symbol: "required",
+    example: "NVDA THS",
+  },
+  {
     code: "OMON",
     title: "Options chain",
     description: "Calls and puts by strike for one expiration, around the price",

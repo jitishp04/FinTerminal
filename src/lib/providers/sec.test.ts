@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import { clearCache } from "../cache";
-import { filings, financials } from "./sec";
+import { filings, financials, insiderTrades } from "./sec";
 
 const TICKERS = {
   "0": { cik_str: 320193, ticker: "AAPL", title: "Apple Inc." },
@@ -247,5 +248,94 @@ describe("filings", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 404, message: expect.stringContaining("QQQ") });
+  });
+});
+
+describe("insiderTrades", () => {
+  const sale = readFileSync(new URL("../fixtures/form4/aapl-sale.xml", import.meta.url), "utf8");
+  const submissions = {
+    ...SUBMISSIONS,
+    filings: {
+      recent: {
+        accessionNumber: ["0001140361-26-041201", "0001140361-26-041202", "0001140361-26-039999", "0000320193-25-000079"],
+        filingDate: ["2026-10-29", "2026-10-28", "2026-10-01", "2025-10-31"],
+        reportDate: ["2026-10-27", "2026-10-27", "2026-09-29", "2025-09-27"],
+        form: ["4", "4/A", "4", "10-K"],
+        primaryDocument: ["xslF345X06/form4.xml", "xslF345X06/form4.xml", "xslF345X06/form4.xml", "aapl-20250927.htm"],
+      },
+    },
+  };
+
+  /** The SEC, with one Form 4 that reads and one that fails. */
+  function stubForms() {
+    const fetchStub = vi.fn(async (url: string) => {
+      if (url.includes("company_tickers")) return json(TICKERS);
+      if (url.includes("submissions/")) return json(submissions);
+      if (url.endsWith("/000114036126041201/form4.xml")) return new Response(sale, { status: 200 });
+      return new Response("", { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetchStub);
+    return fetchStub;
+  }
+
+  it("reads each Form 4's XML, leaving out amendments, and keeps going past one that fails", async () => {
+    const fetchStub = stubForms();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await insiderTrades("AAPL");
+
+    expect(result).toMatchObject({ symbol: "AAPL", name: "Apple Inc.", filings: 2, skipped: 1, aboutOthers: 0, since: "2026-10-01" });
+    expect(result.trades).toEqual([
+      expect.objectContaining({ insider: "Newstead Jennifer", code: "S", shares: 2399, price: 343.36, filed: "2026-10-29" }),
+    ]);
+    const urls = fetchStub.mock.calls.map(([url]) => url);
+    expect(urls).toContain("https://www.sec.gov/Archives/edgar/data/320193/000114036126041201/form4.xml");
+    expect(urls.some((url) => url.includes("000114036126041202"))).toBe(false);
+  });
+
+  it("leaves out a filing about another company's stock, as a large holder files", async () => {
+    // Apple's list, with one of its Form 4s about Intel instead: the issuer is what decides.
+    const aboutIntel = readFileSync(new URL("../fixtures/form4/intc-buy.xml", import.meta.url), "utf8");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("company_tickers")) return json(TICKERS);
+        if (url.includes("submissions/")) return json(submissions);
+        if (url.endsWith("/000114036126041201/form4.xml")) return new Response(sale, { status: 200 });
+        return new Response(aboutIntel, { status: 200 });
+      }),
+    );
+
+    const result = await insiderTrades("AAPL");
+
+    expect(result.trades.map((t) => t.insider)).toEqual(["Newstead Jennifer"]);
+    expect(result).toMatchObject({ filings: 2, skipped: 0, aboutOthers: 1 });
+  });
+
+  it("puts the newest trade first, whichever filing it came in", async () => {
+    // The newest filing holds the older trades, the 1 October vesting, and the older filing the 27 October sale.
+    const vest = readFileSync(new URL("../fixtures/form4/aapl-vest.xml", import.meta.url), "utf8");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("company_tickers")) return json(TICKERS);
+        if (url.includes("submissions/")) return json(submissions);
+        return new Response(url.endsWith("/000114036126041201/form4.xml") ? vest : sale, { status: 200 });
+      }),
+    );
+
+    const result = await insiderTrades("AAPL");
+
+    expect(result.trades.map((t) => `${t.date} ${t.code}`)).toEqual(["2026-10-27 S", "2026-10-01 M", "2026-10-01 F"]);
+  });
+
+  it("reads a filing once, since it never changes", async () => {
+    const fetchStub = stubForms();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await insiderTrades("AAPL");
+    await insiderTrades("AAPL");
+
+    expect(fetchStub.mock.calls.filter(([url]) => url.endsWith("/000114036126041201/form4.xml"))).toHaveLength(1);
   });
 });

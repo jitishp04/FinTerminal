@@ -94,6 +94,42 @@ export interface Filings {
   filings: Filing[];
 }
 
+/** One common-stock transaction from a Form 4. */
+export interface InsiderTrade {
+  /** As filed, usually last name first. A joint filing's owners are joined with "and". */
+  insider: string;
+  /** "CEO, Director", "10% owner", … */
+  role: string;
+  date: string;
+  /** The SEC's transaction code: P, S, A, M, F, G, … */
+  code: string;
+  /** Shares acquired, or else disposed of. */
+  acquired: boolean;
+  shares: number;
+  /** Per share. Missing when the filing gives it only in a footnote. */
+  price?: number;
+  sharesAfter?: number;
+  /** Held directly, rather than through a trust, family member or fund. */
+  direct: boolean;
+  filed: string;
+  /** The filing on sec.gov. */
+  url: string;
+}
+
+export interface InsiderTrades {
+  symbol: string;
+  name: string;
+  /** Newest first. */
+  trades: InsiderTrade[];
+  /** How many Form 4 filings were read, and how many of those couldn't be. */
+  filings: number;
+  skipped: number;
+  /** Filings about another company's stock, which a large holder files too, and which are left out. */
+  aboutOthers: number;
+  /** When the oldest of them was filed. */
+  since?: string;
+}
+
 export interface Observation {
   /** As FRED dates it: a day, a week's last day, or the first day of a month, quarter or year. */
   date: string;

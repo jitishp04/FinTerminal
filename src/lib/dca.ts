@@ -211,7 +211,8 @@ export function luckCheck(days: DailyClose[], dividends: Dividend[], plan: Plan,
   };
 }
 
-const ordinal = (n: number) => {
+/** "1st", "22nd", "13th". */
+export const ordinal = (n: number) => {
   const suffix = n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th";
   return `${n}${suffix}`;
 };

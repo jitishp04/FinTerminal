@@ -50,6 +50,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `<SYM> FA` | Income statement, balance sheet and cash flow |
 | `<SYM> CF` | SEC filings |
 | `<SYM> INS` | Insider filings: Forms 3, 4 and 5 |
+| `<SYM> DCA` | Dollar-cost averaging backtest: every schedule against a lump sum |
 | `W` | Your watchlist |
 | `WEI` | World indices |
 | `SECT` | Sector heatmap |

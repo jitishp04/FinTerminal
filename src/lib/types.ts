@@ -164,6 +164,38 @@ export interface Chart {
   bars: Bar[];
 }
 
+/** What a DCF starts from, each with where it came from. Money is in US dollars, as the SEC has it. */
+export interface DcfInputs {
+  symbol: string;
+  name: string;
+  /** The price's currency. */
+  currency?: string;
+  price: number;
+  /** Yahoo's. Missing for some companies. */
+  beta?: number;
+  /** The 10-year Treasury yield in %, FRED's DGS10. */
+  riskFree: Observation;
+  freeCashFlow: {
+    value: number;
+    operatingCashFlow: number;
+    capitalExpenditures: number;
+    /** "the 4 quarters to 2026-09-30", or "FY2026" when a quarter is missing. */
+    period: string;
+  };
+  /** The latest balance sheet. A line the company didn't report is 0. */
+  balance: { date: string; cash: number; shortTermInvestments: number; currentDebt: number; longTermDebt: number };
+  /** Diluted, weighted over the period. */
+  shares: { value: number; period: string };
+  /** Annual, oldest first. */
+  revenue: { period: string; value: number }[];
+}
+
+/** Why a DCF doesn't fit a symbol, instead of its inputs. */
+export interface DcfUnfit {
+  symbol: string;
+  reason: string;
+}
+
 export interface DailyClose {
   /** The trading day, in the exchange's time zone, e.g. "2024-06-07". */
   date: string;

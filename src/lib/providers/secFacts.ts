@@ -125,6 +125,12 @@ const BALANCE: LineSpec[] = [
   },
   { key: "currentLiabilities", label: "Current liabilities", tags: ["LiabilitiesCurrent"] },
   {
+    // The part of long-term debt due within a year, with leases where long-term debt has them too.
+    key: "currentDebt",
+    label: "Current portion of long-term debt",
+    tags: ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent"],
+  },
+  {
     key: "longTermDebt",
     label: "Long-term debt",
     tags: ["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations", "LongTermDebt"],

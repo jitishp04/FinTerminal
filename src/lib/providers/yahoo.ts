@@ -54,6 +54,9 @@ const SCREEN_COUNT = 250;
 
 const MOVERS_COUNT = 25;
 
+/** Listings Yahoo has no report dates for, and the one it keeps the same company's under. */
+const EARNINGS_LISTINGS: Record<string, string> = { "NOKIA-SEK.ST": "NOK" };
+
 const daysAgo = (days: number) => (now: Date) => new Date(now.getTime() - days * DAY);
 const startOfYear = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
 
@@ -197,7 +200,23 @@ export function weekly(symbol: string): Promise<Weekly> {
   return cached(`weekly:${symbol}`, WEEKLY_TTL, () =>
     orNotFound(symbol, async () => {
       const { meta, quotes } = await yahoo.chart(symbol, { period1: new Date(0), interval: "1d", includePrePost: false });
-      return { symbol: meta.symbol, currency: meta.currency, weeks: toWeeks(toBars(quotes), meta.exchangeTimezoneName) };
+      const timeZone = meta.exchangeTimezoneName;
+      return { symbol: meta.symbol, currency: meta.currency, timeZone, weeks: toWeeks(toBars(quotes), timeZone) };
+    }),
+  );
+}
+
+/**
+ * When a company last reported, oldest first, in epoch seconds: Yahoo keeps four.
+ * Empty for funds, FX and the like, and for the few companies Yahoo has no dates for.
+ */
+export function earningsDates(symbol: string): Promise<number[]> {
+  const listing = EARNINGS_LISTINGS[symbol] ?? symbol;
+  return cached(`earnings:${listing}`, PROFILE_TTL, () =>
+    orNotFound(listing, async () => {
+      // With `price` alongside, Yahoo answers for a symbol that has no earnings, as in profile().
+      const { earnings } = await yahoo.quoteSummary(listing, { modules: ["price", "earnings"] });
+      return (earnings?.earningsChart.quarterly ?? []).map(({ reportedDate }) => seconds(reportedDate)).sort((a, b) => a - b);
     }),
   );
 }

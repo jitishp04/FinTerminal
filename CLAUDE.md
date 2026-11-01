@@ -39,7 +39,7 @@ src/components/functions/*.tsx   one component per function code
 ## Data sources
 | Data | Source | Key |
 |---|---|---|
-| Quotes, charts, profile, movers, option chains, stock screens (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
+| Quotes, charts, profile, movers, option chains, stock screens, earnings dates (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
 | Quote fallback (US stocks) | Finnhub | `FINNHUB_API_KEY` |
 | Live trades (US stocks and funds) | Finnhub websocket, one per server, fanned out over SSE (`/api/stream`) | `FINNHUB_API_KEY` |
 | Live trades (`CRYPTO`'s coins) | Coinbase Exchange's public websocket, through the same hub and SSE stream | none |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { benchmarkFor, dipped, readWeeks, toWeeks } from "./thesis";
+import { benchmarkFor, dipped, readWeeks, summaryRows, toWeeks } from "./thesis";
 import type { Bar, Thesis } from "./types";
 
 const DAY = 86_400;
@@ -64,8 +64,8 @@ const bar = (i: number, close: number, more: Partial<Bar> = {}): Bar => ({
 /** `count` weeks rising by `step`, ending at `last`. */
 const climb = (count: number, step = 2, last = 300) => Array.from({ length: count }, (_, i) => last - (count - 1 - i) * step);
 
-function thesis(weeks: Bar[], benchmark = weeks.map(({ time }) => ({ time, close: 100 }))): Thesis {
-  return { symbol: "TEST", currency: "USD", weeks, benchmark: { symbol: "^GSPC", name: "S&P", weeks: benchmark } };
+function thesis(weeks: Bar[], benchmark = weeks.map(({ time }) => ({ time, close: 100 })), earnings: number[] = []): Thesis {
+  return { symbol: "TEST", currency: "USD", timeZone: "UTC", weeks, benchmark: { symbol: "^GSPC", name: "S&P", weeks: benchmark }, earnings };
 }
 
 const weeksOf = (closes: number[]) => closes.map((close, i) => bar(i, close));
@@ -288,5 +288,129 @@ describe("strong momentum", () => {
     expect(last.bar.close).toBeGreaterThan(last.upper!);
     expect(last.rsi).toBeLessThan(70);
     expect(last.momentum).toBe(false);
+  });
+});
+
+describe("summaryRows", () => {
+  const rows = (subject: Thesis) => Object.fromEntries(summaryRows(subject, readWeeks(subject)).map((row) => [row.label, row]));
+  const valueOf = (weeks: Bar[], label: string) => rows(thesis(weeks))[label].value;
+
+  it("lists the rows in the script's order", () => {
+    expect(summaryRows(thesis(weeksOf(climb(60))), readWeeks(thesis(weeksOf(climb(60))))).map((row) => row.label)).toEqual([
+      "Trend",
+      "vs 40w line",
+      "12m return",
+      "Rel. strength",
+      "From 52w high",
+      "Earnings weeks vs mkt",
+    ]);
+  });
+
+  describe("Trend", () => {
+    it("is an uptrend above a rising line", () => {
+      expect(rows(thesis(weeksOf(climb(60)))).Trend).toMatchObject({ value: "Uptrend", tone: "up" });
+    });
+
+    it("says to re-check below a falling line", () => {
+      expect(rows(thesis(weeksOf(climb(60).reverse()))).Trend).toMatchObject({ value: "Downtrend: re-check", tone: "down" });
+    });
+
+    it("is mixed above a falling line", () => {
+      const weeks = [...falling, bar(60, 103)];
+      expect(rows(thesis(weeks)).Trend).toMatchObject({ value: "Mixed", tone: "amber" });
+    });
+
+    it("is mixed below a rising line", () => {
+      const weeks = [...weeksOf(climb(60)), bar(60, 200)];
+      expect(rows(thesis(weeks)).Trend).toMatchObject({ value: "Mixed", tone: "amber" });
+    });
+
+    it("waits for 44 weeks", () => {
+      expect(rows(thesis(weeksOf(climb(43)))).Trend).toEqual({ label: "Trend", value: "Not enough history" });
+      expect(rows(thesis(weeksOf(climb(44)))).Trend.value).toBe("Uptrend");
+    });
+  });
+
+  it("gives the distance from the 40-week line in whole percents, signed", () => {
+    // The 40-week average of 100s and a 112 is 100.3.
+    expect(valueOf(weeksOf([...Array(59).fill(100), 112]), "vs 40w line")).toBe("+12%");
+    expect(valueOf(weeksOf([...Array(59).fill(100), 90]), "vs 40w line")).toBe("-10%");
+    expect(valueOf(weeksOf(Array(60).fill(100)), "vs 40w line")).toBe("+0%");
+    expect(valueOf(weeksOf(Array(39).fill(100)), "vs 40w line")).toBe("n/a");
+  });
+
+  it("compares 12 months with the market's over the same 52 weeks", () => {
+    const closes = [...Array(10).fill(100), ...Array(52).fill(100)].map((close, i, all) => (i === all.length - 1 ? 130 : close));
+    const market = closes.map((_, i) => ({ time: MONDAY + i * WEEK, close: i === closes.length - 1 ? 110 : 100 }));
+    expect(rows(thesis(weeksOf(closes), market))["12m return"].value).toBe("+30% (S&P +10%)");
+  });
+
+  it("names the market it's measured against", () => {
+    const subject = thesis(weeksOf(climb(60)));
+    const swedish = { ...subject, benchmark: { ...subject.benchmark, name: "OMXS30" } };
+    expect(rows(swedish)["12m return"].value).toContain("(OMXS30 ");
+  });
+
+  it("has no 12-month return for under 53 weeks", () => {
+    expect(valueOf(weeksOf(Array(52).fill(100)), "12m return")).toBe("n/a (S&P n/a)");
+    expect(valueOf(weeksOf(Array(53).fill(100)), "12m return")).toBe("+0% (S&P +0%)");
+  });
+
+  it("says whether the stock beats the market", () => {
+    const beating = [...Array(59).fill(100), 150];
+    const lagging = [...Array(59).fill(100), 50];
+    expect(rows(thesis(weeksOf(beating)))["Rel. strength"]).toMatchObject({ value: "Beating market", tone: "up" });
+    expect(rows(thesis(weeksOf(lagging)))["Rel. strength"]).toMatchObject({ value: "Lagging market", tone: "down" });
+    expect(rows(thesis(weeksOf(Array(60).fill(100))))["Rel. strength"].value).toBe("Beating market");
+    expect(rows(thesis(weeksOf(Array(51).fill(100))))["Rel. strength"]).toEqual({ label: "Rel. strength", value: "n/a" });
+  });
+
+  it("measures the drop from the highest high of the last 52 weeks, this one included", () => {
+    const peak = bar(30, 100, { high: 200 });
+    const weeks = weeksOf(Array(60).fill(100)).map((week, i) => (i === 30 ? peak : week));
+    expect(valueOf(weeks, "From 52w high")).toBe("-50%");
+    // The same high, now 52 weeks ago and out of the window.
+    const old = weeksOf(Array(60).fill(100)).map((week, i) => (i === 7 ? { ...week, high: 200 } : week));
+    expect(valueOf(old, "From 52w high")).toBe("-0%");
+    expect(valueOf(weeksOf(Array(51).fill(100)), "From 52w high")).toBe("n/a");
+  });
+
+  describe("Earnings weeks vs mkt", () => {
+    const closes = Array.from({ length: 12 }, (_, i) => 100 + i);
+    const flat = closes.map((_, i) => ({ time: MONDAY + i * WEEK, close: 100 }));
+    const reported = (i: number) => MONDAY + i * WEEK + 3 * DAY + 20 * 3600;
+
+    it("is that week's return less the market's, in points, oldest first", () => {
+      // 100 to 110 in the stock's week against 100 to 105 for the market.
+      const stock = closes.map((close, i) => (i === 5 ? 110 : i === 6 ? 121 : 100));
+      const market = flat.map((week, i) => (i === 5 ? { ...week, close: 105 } : i === 6 ? { ...week, close: 105 } : week));
+      const subject = thesis(weeksOf(stock), market, [reported(5), reported(6)]);
+      expect(rows(subject)["Earnings weeks vs mkt"].value).toBe("+5  +10 %");
+    });
+
+    it("marks a week that lagged with a minus", () => {
+      const stock = closes.map((_, i) => (i === 5 ? 96 : 100));
+      expect(rows(thesis(weeksOf(stock), flat, [reported(5)]))["Earnings weeks vs mkt"].value).toBe("-4 %");
+    });
+
+    it("finds the week by the date on the exchange", () => {
+      // Late on Sunday in UTC is the next week's Monday in Stockholm.
+      const stock = closes.map((_, i) => (i === 5 ? 110 : 100));
+      const lateSunday = MONDAY + 5 * WEEK - 1800;
+      const subject = { ...thesis(weeksOf(stock), flat, [lateSunday]), timeZone: "Europe/Stockholm" };
+      expect(rows(subject)["Earnings weeks vs mkt"].value).toBe("+10 %");
+    });
+
+    it("skips a report with no week before it to compare with", () => {
+      expect(rows(thesis(weeksOf(closes), flat, [reported(0)]))["Earnings weeks vs mkt"].value).toBe("n/a");
+    });
+
+    it("skips a report from before the market's history", () => {
+      expect(rows(thesis(weeksOf(closes), flat.slice(6), [reported(5)]))["Earnings weeks vs mkt"].value).toBe("n/a");
+    });
+
+    it("says n/a with no reports", () => {
+      expect(rows(thesis(weeksOf(closes), flat))["Earnings weeks vs mkt"].value).toBe("n/a");
+    });
   });
 });

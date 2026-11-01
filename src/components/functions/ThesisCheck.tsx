@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { fetchApi, pollEvery } from "@/lib/fetchApi";
-import { readWeeks, type SignalLabel, type ThesisWeek } from "@/lib/thesis";
+import { readWeeks, type SignalLabel, summaryRows, type SummaryRow, type ThesisWeek } from "@/lib/thesis";
 import type { Thesis } from "@/lib/types";
 import { QuoteLine } from "./QuoteLine";
 import { SourceError } from "./SourceError";
@@ -19,6 +19,8 @@ const VOL_RULE =
 const RULES: Record<SignalLabel, string> = { BUY: BUY_RULE, VOL: VOL_RULE, "BUY+VOL": `${BUY_RULE} ${VOL_RULE}` };
 const MOMENTUM_RULE =
   "Strong momentum: the week closed above the upper band with RSI at 70 or higher. Followed by better than average returns in the test, so it is not a reason on its own to trim.";
+
+const TONES = { up: "text-up", down: "text-down", amber: "text-amber" };
 
 /** What the signals on a week mean, if it has any. */
 function ruleFor(week: ThesisWeek | undefined): string | undefined {
@@ -41,7 +43,7 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
   const rule = ruleFor(weeks.find((week) => week.bar.time === hovered));
 
   return (
-    <div className="flex h-full flex-col gap-1.5">
+    <div className="@container flex h-full flex-col gap-1.5">
       <QuoteLine symbol={symbol} />
       {thesis.isPending && (
         <p role="status" className="text-muted">
@@ -56,12 +58,16 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
       )}
       {thesis.data && weeks.length > 0 && (
         <>
-          {/* Keeps a usable size in a short panel, which then scrolls to it. */}
-          <div className="relative min-h-56 flex-1">
-            <ThesisChart weeks={weeks} label={`${symbol} weekly chart`} onHover={setHovered} />
-            {rule && (
-              <p className="pointer-events-none absolute top-1 right-16 left-1 z-10 rounded-sm bg-panel/90 px-1.5 py-0.5 text-xs">{rule}</p>
-            )}
+          {/* Above the chart, to be read first in a small panel, and beside it in a wide one. */}
+          <div className="flex flex-1 flex-col gap-1.5 @3xl:flex-row-reverse @3xl:gap-3">
+            <Summary rows={summaryRows(thesis.data, weeks)} />
+            {/* Keeps a usable size in a short panel, which then scrolls to it. */}
+            <div className="relative min-h-48 min-w-0 flex-1">
+              <ThesisChart weeks={weeks} label={`${symbol} weekly chart`} onHover={setHovered} />
+              {rule && (
+                <p className="pointer-events-none absolute top-1 right-16 left-1 z-10 rounded-sm bg-panel/90 px-1.5 py-0.5 text-xs">{rule}</p>
+              )}
+            </div>
           </div>
           <p className="text-xs text-muted">
             Weekly. Middle pane: strength against the {thesis.data.benchmark.name}, above 0 when beating it. Point at a label for its
@@ -70,5 +76,19 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
         </>
       )}
     </div>
+  );
+}
+
+/** The indicator's table: rows that wrap across a narrow panel, or a column beside the chart in a wide one. */
+function Summary({ rows }: { rows: SummaryRow[] }) {
+  return (
+    <dl className="flex shrink-0 flex-wrap gap-x-4 text-xs @3xl:w-80 @3xl:flex-col @3xl:flex-nowrap @3xl:gap-y-1 @3xl:text-sm">
+      {rows.map(({ label, value, tone }) => (
+        <div key={label} className="flex justify-between gap-1.5">
+          <dt className="text-muted">{label}</dt>
+          <dd className={`whitespace-pre ${tone ? TONES[tone] : ""}`}>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

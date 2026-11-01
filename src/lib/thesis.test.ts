@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { benchmarkFor, dipped, readWeeks, summaryRows, toWeeks } from "./thesis";
-import type { Bar, Thesis } from "./types";
+import type { Bar, Mood, Thesis } from "./types";
 
 const DAY = 86_400;
 // Monday 5 January 2026, 00:00 UTC.
@@ -292,17 +292,19 @@ describe("strong momentum", () => {
 });
 
 describe("summaryRows", () => {
-  const rows = (subject: Thesis) => Object.fromEntries(summaryRows(subject, readWeeks(subject)).map((row) => [row.label, row]));
+  const rows = (subject: Thesis) => Object.fromEntries(summaryRows(subject, readWeeks(subject), undefined).map((row) => [row.label, row]));
   const valueOf = (weeks: Bar[], label: string) => rows(thesis(weeks))[label].value;
 
   it("lists the rows in the script's order", () => {
-    expect(summaryRows(thesis(weeksOf(climb(60))), readWeeks(thesis(weeksOf(climb(60))))).map((row) => row.label)).toEqual([
+    const subject = thesis(weeksOf(climb(60)));
+    expect(summaryRows(subject, readWeeks(subject), undefined).map((row) => row.label)).toEqual([
       "Trend",
       "vs 40w line",
       "12m return",
       "Rel. strength",
       "From 52w high",
       "Earnings weeks vs mkt",
+      "Market mood",
     ]);
   });
 
@@ -373,6 +375,46 @@ describe("summaryRows", () => {
     const old = weeksOf(Array(60).fill(100)).map((week, i) => (i === 7 ? { ...week, high: 200 } : week));
     expect(valueOf(old, "From 52w high")).toBe("-0%");
     expect(valueOf(weeksOf(Array(51).fill(100)), "From 52w high")).toBe("n/a");
+  });
+
+  describe("Market mood", () => {
+    const subject = thesis(weeksOf(climb(60)));
+    const read = readWeeks(subject);
+    const row = (mood: Mood | undefined) => summaryRows(subject, read, mood).at(-1)!;
+    const scored = (score: number, used: number): Mood => ({
+      score,
+      parts: ["Momentum", "New highs vs lows", "Breadth", "Put/call", "VIX", "Stocks vs bonds", "Junk bonds"].map((name, i) =>
+        i < used ? { name, score } : { name },
+      ),
+    });
+
+    it("gives the score, its band, and how many inputs it used", () => {
+      expect(row(scored(62, 5))).toMatchObject({ value: "62 Greed (5/7)", tone: "up" });
+      expect(row(scored(12.4, 4))).toMatchObject({ value: "12 Extreme fear (4/7)", tone: "down" });
+    });
+
+    it("leaves the count out with all seven", () => {
+      expect(row(scored(50, 7))).toMatchObject({ value: "50 Neutral" });
+    });
+
+    it("goes by the unrounded score, as the script does", () => {
+      expect(row(scored(24.6, 5)).value).toBe("25 Extreme fear (5/7)");
+    });
+
+    it("says n/a with no score", () => {
+      expect(row({ parts: [] })).toEqual({ label: "Market mood", value: "n/a" });
+    });
+
+    it("waits for the score to load", () => {
+      expect(row(undefined)).toEqual({ label: "Market mood", value: "…" });
+    });
+
+    it("spells out each input, and which ones are missing", () => {
+      expect(row(scored(62, 2)).title).toBe(
+        "Momentum 62, New highs vs lows 62. Not available: Breadth, Put/call, VIX, Stocks vs bonds, Junk bonds.",
+      );
+      expect(row(scored(62, 7)).title).not.toContain("Not available");
+    });
   });
 
   describe("Earnings weeks vs mkt", () => {

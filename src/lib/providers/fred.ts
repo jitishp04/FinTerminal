@@ -82,6 +82,11 @@ export async function curve(): Promise<YieldCurve> {
   return toCurve(await Promise.all(TENORS.map(async ({ id }) => (await readings(id)).observations)));
 }
 
+/** Every reading of a series, oldest first. */
+export async function observations(id: string): Promise<Observation[]> {
+  return (await readings(id)).observations;
+}
+
 /** A series' newest reading. */
 export async function latest(id: string): Promise<Observation> {
   const { observations } = await readings(id);

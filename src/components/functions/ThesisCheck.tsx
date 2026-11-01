@@ -4,13 +4,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { readWeeks, type SignalLabel, summaryRows, type SummaryRow, type ThesisWeek } from "@/lib/thesis";
-import type { Thesis } from "@/lib/types";
+import type { Mood, Thesis } from "@/lib/types";
 import { QuoteLine } from "./QuoteLine";
 import { SourceError } from "./SourceError";
 import { ThesisChart } from "./ThesisChart";
 
 // The server keeps a symbol's weeks for 9 minutes.
 const REFRESH = 10 * 60_000;
+// The inputs move once a day.
+const MOOD_REFRESH = 60 * 60_000;
+const NO_MOOD: Mood = { parts: [] };
 
 const BUY_RULE =
   "BUY: pullback in an uptrend. Price is above a rising 40-week line and this week touched the lower Bollinger Band or RSI fell to 40 or below. In the 2026-10-17 test this was followed by about +3% over the next half-year vs an ordinary week. A prompt to look closer, not an order.";
@@ -39,6 +42,12 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
     // Fresh until the next poll, so switching windows doesn't refetch it.
     staleTime: REFRESH,
   });
+  const mood = useQuery({
+    queryKey: ["mood"],
+    queryFn: () => fetchApi<Mood>("/api/mood"),
+    refetchInterval: pollEvery(MOOD_REFRESH),
+    staleTime: MOOD_REFRESH,
+  });
   const weeks = useMemo(() => (thesis.data ? readWeeks(thesis.data) : []), [thesis.data]);
   const rule = ruleFor(weeks.find((week) => week.bar.time === hovered));
 
@@ -60,9 +69,9 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
         <>
           {/* Above the chart, to be read first in a small panel, and beside it in a wide one. */}
           <div className="flex flex-1 flex-col gap-1.5 @3xl:flex-row-reverse @3xl:gap-3">
-            <Summary rows={summaryRows(thesis.data, weeks)} />
+            <Summary rows={summaryRows(thesis.data, weeks, mood.data ?? (mood.isError ? NO_MOOD : undefined))} />
             {/* Keeps a usable size in a short panel, which then scrolls to it. */}
-            <div className="relative min-h-48 min-w-0 flex-1">
+            <div className="relative min-h-44 min-w-0 flex-1">
               <ThesisChart weeks={weeks} label={`${symbol} weekly chart`} onHover={setHovered} />
               {rule && (
                 <p className="pointer-events-none absolute top-1 right-16 left-1 z-10 rounded-sm bg-panel/90 px-1.5 py-0.5 text-xs">{rule}</p>
@@ -83,10 +92,12 @@ export function ThesisCheck({ symbol }: { symbol: string }) {
 function Summary({ rows }: { rows: SummaryRow[] }) {
   return (
     <dl className="flex shrink-0 flex-wrap gap-x-4 text-xs @3xl:w-80 @3xl:flex-col @3xl:flex-nowrap @3xl:gap-y-1 @3xl:text-sm">
-      {rows.map(({ label, value, tone }) => (
+      {rows.map(({ label, value, tone, title }) => (
         <div key={label} className="flex justify-between gap-1.5">
           <dt className="text-muted">{label}</dt>
-          <dd className={`whitespace-pre ${tone ? TONES[tone] : ""}`}>{value}</dd>
+          <dd title={title} className={`whitespace-pre ${tone ? TONES[tone] : ""}`}>
+            {value}
+          </dd>
         </div>
       ))}
     </dl>

@@ -129,6 +129,7 @@ describe("health", () => {
       { id: "fred", name: "FRED", state: "idle" },
       { id: "finnhub", name: "Finnhub", state: "idle" },
       { id: "coinbase", name: "Coinbase", state: "idle" },
+      { id: "cboe", name: "Cboe", state: "idle" },
     ]);
   });
 

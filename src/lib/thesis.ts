@@ -1,7 +1,8 @@
 // THS: a stock's weekly picture, after two TradingView indicators, "Thesis check" and "BB RSI". The rules are theirs, unchanged.
 import { wallClock } from "./chartData";
 import { bollinger, rsi, sma } from "./indicators";
-import type { Bar, Thesis, WeekClose } from "./types";
+import { moodBand } from "./mood";
+import type { Bar, Mood, Thesis, WeekClose } from "./types";
 
 const DAY = 86_400;
 const TREND_WEEKS = 40;
@@ -146,6 +147,8 @@ export interface SummaryRow {
   label: string;
   value: string;
   tone?: "up" | "down" | "amber";
+  /** More on the value, for a tooltip. */
+  title?: string;
 }
 
 /** A whole percent with its sign, as the indicator's table shows it. */
@@ -180,8 +183,22 @@ function strengthRow({ strength }: ThesisWeek): SummaryRow {
   return strength >= 0 ? { label, value: "Beating market", tone: "up" } : { label, value: "Lagging market", tone: "down" };
 }
 
+/** The market's mood, or "…" until it loads. A score from fewer than all the inputs says how many. */
+function moodRow(mood: Mood | undefined): SummaryRow {
+  const label = "Market mood";
+  if (!mood) return { label, value: "…" };
+  if (mood.score === undefined) return { label, value: "n/a" };
+  const { name, tone } = moodBand(mood.score);
+  const scored = mood.parts.filter(({ score }) => score !== undefined);
+  const missing = mood.parts.filter(({ score }) => score === undefined);
+  const count = missing.length > 0 ? ` (${scored.length}/${mood.parts.length})` : "";
+  const scores = scored.map(({ name: part, score }) => `${part} ${score!.toFixed(0)}`).join(", ");
+  const notes = missing.length > 0 ? ` Not available: ${missing.map((part) => part.name).join(", ")}.` : "";
+  return { label, value: `${mood.score.toFixed(0)} ${name}${count}`, title: `${scores}.${notes}`, ...(tone && { tone }) };
+}
+
 /** The indicator's table, for the latest week of `read`. */
-export function summaryRows(thesis: Thesis, read: ThesisWeek[]): SummaryRow[] {
+export function summaryRows(thesis: Thesis, read: ThesisWeek[], mood: Mood | undefined): SummaryRow[] {
   const { weeks, benchmark } = thesis;
   const last = read.length - 1;
   const latest = read[last];
@@ -200,5 +217,6 @@ export function summaryRows(thesis: Thesis, read: ThesisWeek[]): SummaryRow[] {
     strengthRow(latest),
     { label: "From 52w high", value: percent(gain(close, high)) },
     { label: "Earnings weeks vs mkt", value: moves.length === 0 ? "n/a" : `${moves.join("  ")} %` },
+    moodRow(mood),
   ];
 }

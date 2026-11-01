@@ -159,6 +159,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "FX",
   },
   {
+    code: "CRYPTO",
+    title: "Crypto",
+    description: "Major coins against the dollar, live from Coinbase",
+    keywords: ["crypto", "cryptocurrency", "bitcoin", "ether", "ethereum", "coins", "solana"],
+    group: "Market",
+    symbol: "none",
+    example: "CRYPTO",
+  },
+  {
     code: "CMDTY",
     title: "Commodities",
     description: "Oil, gold, natural gas, grains and more",

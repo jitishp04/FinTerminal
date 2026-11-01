@@ -1,5 +1,6 @@
-// Live prices: which symbols Finnhub streams, what a trade does to a quote, and the page's one stream of them.
+// Live prices: which symbols stream, what a trade does to a quote, and the page's one stream of them.
 import { isUsMarketOpen } from "./market";
+import { CRYPTO } from "./monitors";
 import { MAX_QUOTE_SYMBOLS, type Quote, type Trade } from "./types";
 
 // Indices, FX, futures, crypto and foreign tickers all carry a mark of some kind: ^GSPC, EURUSD=X, GC=F, BTC-USD, VOD.L.
@@ -8,18 +9,28 @@ const US_TICKER = /^[A-Z]{1,5}(-[A-Z])?$/;
 /** Whether Finnhub has this symbol: its free plan has US stocks and funds only. */
 export const covers = (symbol: string) => US_TICKER.test(symbol);
 
+const COINS = new Set(CRYPTO.flatMap((group) => group.items.map((item) => item.symbol)));
+
+/** Whether Coinbase streams this symbol: the coins `CRYPTO` shows, which it lists under Yahoo's names. */
+export const isCoin = (symbol: string) => COINS.has(symbol);
+
+/** Whether any source streams this symbol. */
+export const streams = (symbol: string) => covers(symbol) || isCoin(symbol);
+
 // What Yahoo calls a US market after the close: its quote then is the day's close.
 const AFTER_THE_CLOSE = new Set(["POST", "POSTPOST", "CLOSED"]);
 
 /**
  * The quote moved on to a newer trade: its last price, change, day's range and time.
- * The quote is Yahoo's regular-session one, so only a trade in that session counts: 09:30 to 16:00
+ * A stock's quote is Yahoo's regular-session one, so only a trade in that session counts: 09:30 to 16:00
  * in New York, and not once Yahoo says the market has closed, as it does early on some holiday eves.
+ * Crypto trades around the clock, so any newer trade counts.
  */
 export function withTrade(quote: Quote, trade: Trade | undefined): Quote {
   if (!trade || quote.previousClose === undefined) return quote;
   if (quote.time !== undefined && trade.time < quote.time) return quote;
-  if (!isUsMarketOpen(new Date(trade.time * 1000)) || AFTER_THE_CLOSE.has(quote.marketState ?? "")) return quote;
+  const inSession = isUsMarketOpen(new Date(trade.time * 1000)) && !AFTER_THE_CLOSE.has(quote.marketState ?? "");
+  if (quote.type !== "CRYPTOCURRENCY" && !inSession) return quote;
   const { price, time } = trade;
   const change = price - quote.previousClose;
   return {
@@ -49,7 +60,7 @@ export type Source = Pick<EventSource, "close"> & {
 export const SETTLE = 100;
 
 /**
- * The page's stream of live trades: one `/api/stream` for every US symbol a panel shows, reopened as that changes.
+ * The page's stream of live trades: one `/api/stream` for every symbol a panel shows that streams, reopened as that changes.
  * `open` makes an EventSource.
  */
 export function createLiveStream(open: (url: string) => Source) {
@@ -98,9 +109,9 @@ export function createLiveStream(open: (url: string) => Source) {
   };
 
   return {
-    /** Streams the symbols Finnhub has, while `symbols` is on screen. Returns a function that lets them go. */
+    /** Streams the symbols a source has, while `symbols` is on screen. Returns a function that lets them go. */
     watch(symbols: string[]): () => void {
-      const own = [...new Set(symbols)].filter(covers);
+      const own = [...new Set(symbols)].filter(streams);
       if (own.length === 0) return () => {};
       for (const symbol of own) wanted.set(symbol, (wanted.get(symbol) ?? 0) + 1);
       settle();

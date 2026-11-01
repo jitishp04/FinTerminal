@@ -62,6 +62,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `N` | News by topic: markets, forex, crypto, mergers |
 | `<SYM> N` | News about one symbol |
 | `FX` | Currencies |
+| `CRYPTO` | Major coins against the dollar, live from Coinbase |
 | `CMDTY` | Commodities |
 | `ECO` | US economic indicators |
 | `ECO <FRED_ID>` | Any FRED series, for example `ECO UNRATE` |
@@ -87,7 +88,7 @@ On a wide enough window, each source has a dot and the time it last answered.
 | Grey | Nothing has asked it yet since the server started. |
 | Hollow, `NO KEY` | It needs a setting in `.env.local` |
 
-`LIVE 4` means four US stocks and funds on screen stream from Finnhub. During the regular session, 09:30 to 16:00 New York time, their prices move with each trade, at most once a second. Other quotes refresh every 10 to 15 seconds.
+`LIVE 4` means four symbols on screen stream live, their prices moving with each trade, at most once a second. US stocks and funds stream from Finnhub during the regular session, 09:30 to 16:00 New York time. `CRYPTO`'s coins stream from Coinbase around the clock, with no key. Other quotes refresh every 10 to 15 seconds.
 
 ## Troubleshooting
 
@@ -101,6 +102,7 @@ Panels show the message in the first column. Fuller errors appear in the termina
 | `SEC EDGAR isn't responding`, and the terminal says `The SEC answered 403` | The SEC refused the request. Check that `SEC_USER_AGENT` isn't blank. The other cause is too many requests, and the SEC's page for that is titled "Request Rate Threshold Exceeded": wait a few minutes before trying again. |
 | `Yahoo Finance isn't responding`, and the terminal mentions a crumb, such as `Failed to get crumb` | The session the app keeps with Yahoo failed. Restart `npm run dev`. If the status in the message is 429, Yahoo is limiting your connection, so wait a while first. If `Could not find crumb` persists, Yahoo may have changed something: run `npm install yahoo-finance2@latest`. With a Finnhub key, US stock quotes keep working in the meantime. |
 | Finnhub shows `DOWN`, there's no `LIVE` in the status bar, and the terminal says `Finnhub's stream failed before it opened` | The live stream can't reach Finnhub. It retries by itself, waiting longer each time, up to a minute, and meanwhile prices refresh every 10 seconds. Check `FINNHUB_API_KEY`, and that your network lets through `ws.finnhub.io`. |
+| Coinbase shows `DOWN`, and the terminal says `Coinbase's stream failed before it opened` | The live crypto stream can't reach Coinbase. It retries the same way, and crypto prices refresh every 10 seconds meanwhile. Check that your network lets through `ws-feed.exchange.coinbase.com`. |
 | `Can't reach the FinTerminal server.` | `npm run dev` has stopped. Start it again. |
 | Something is failing that shouldn't be | Check whether `FAIL_SOURCES` is set in `.env.local`. See below. |
 | `is not a function` in the terminal, or old behavior after switching git branches | The dev server is holding old code. Restart `npm run dev`. |
@@ -109,7 +111,7 @@ Panels show the message in the first column. Fuller errors appear in the termina
 
 ### Trying out a failure
 
-To see what the panels do when a source fails, add this to `.env.local`, using any of `yahoo`, `sec`, `fred` and `finnhub`:
+To see what the panels do when a source fails, add this to `.env.local`, using any of `yahoo`, `sec`, `fred`, `finnhub` and `coinbase`:
 
 ```
 FAIL_SOURCES=yahoo

@@ -127,9 +127,37 @@ export const COMMODITIES: MonitorGroup[] = [
   },
 ];
 
+/** Coins against the US dollar, each one Coinbase streams under the same name Yahoo quotes it by. */
+export const CRYPTO: MonitorGroup[] = [
+  {
+    title: "Bitcoin and Ether",
+    items: [
+      { symbol: "BTC-USD", name: "Bitcoin" },
+      { symbol: "ETH-USD", name: "Ether" },
+    ],
+  },
+  {
+    title: "Other coins",
+    items: [
+      { symbol: "SOL-USD", name: "Solana" },
+      { symbol: "XRP-USD", name: "XRP" },
+      { symbol: "DOGE-USD", name: "Dogecoin", decimals: 5 },
+      { symbol: "ADA-USD", name: "Cardano" },
+      { symbol: "AVAX-USD", name: "Avalanche" },
+      { symbol: "LINK-USD", name: "Chainlink" },
+      { symbol: "LTC-USD", name: "Litecoin" },
+      { symbol: "BCH-USD", name: "Bitcoin Cash" },
+      { symbol: "DOT-USD", name: "Polkadot" },
+      { symbol: "XLM-USD", name: "Stellar" },
+      { symbol: "SHIB-USD", name: "Shiba Inu", decimals: 8 },
+    ],
+  },
+];
+
 /** The panels drawn from these lists, by function code. */
 export const MONITORS: Record<string, MonitorGroup[]> = {
   WEI: WORLD_INDICES,
   FX: CURRENCIES,
   CMDTY: COMMODITIES,
+  CRYPTO,
 };

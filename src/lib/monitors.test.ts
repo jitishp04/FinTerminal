@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isSymbol } from "./commands";
-import { COMMODITIES, CURRENCIES, MONITORS, SECTORS, WORLD_INDICES } from "./monitors";
+import { COMMODITIES, CRYPTO, CURRENCIES, MONITORS, SECTORS, WORLD_INDICES } from "./monitors";
 import { MAX_QUOTE_SYMBOLS } from "./types";
 
 const titles = (groups: typeof WORLD_INDICES) => groups.map((group) => group.title);
@@ -10,6 +10,7 @@ describe("monitor groups", () => {
     expect(titles(WORLD_INDICES)).toEqual(["Americas", "EMEA", "Asia-Pacific"]);
     expect(titles(CURRENCIES)).toEqual(["Majors", "Crosses", "Emerging markets", "US dollar"]);
     expect(titles(COMMODITIES)).toEqual(["Energy", "Metals", "Agriculture"]);
+    expect(titles(CRYPTO)).toEqual(["Bitcoin and Ether", "Other coins"]);
   });
 });
 

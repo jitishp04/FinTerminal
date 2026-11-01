@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLiveStream, SETTLE, type Source, withTrade } from "./live";
+import { createLiveStream, isCoin, SETTLE, type Source, streams, withTrade } from "./live";
 import { MAX_QUOTE_SYMBOLS, type Quote } from "./types";
 
 // Monday 2 November 2026 in New York, on Eastern Standard Time: 09:30 there is 14:30 UTC.
@@ -69,6 +69,14 @@ describe("withTrade", () => {
     expect(withTrade(closed, trade(272, at(13, 30)))).toBe(closed);
   });
 
+  it("counts a crypto trade at any hour, even on a Sunday night, as long as it's newer", () => {
+    const btc: Quote = { ...AAPL, symbol: "BTC-USD", type: "CRYPTOCURRENCY", price: 77_000, previousClose: 76_000, marketState: "REGULAR", time: at(-2, 0) };
+    // 22:30 on Sunday in New York.
+    const sunday = Date.UTC(2026, 10, 2, 3, 30) / 1000;
+    expect(withTrade(btc, { symbol: "BTC-USD", price: 77_500, time: sunday })).toMatchObject({ price: 77_500, change: 1_500 });
+    expect(withTrade(btc, { symbol: "BTC-USD", price: 77_500, time: at(-3, 0) })).toBe(btc);
+  });
+
   it("leaves a quote with no previous close, and one with no trade", () => {
     const unanchored = { ...AAPL, previousClose: undefined };
     expect(withTrade(unanchored, trade(272, at(10, 1)))).toBe(unanchored);
@@ -125,7 +133,14 @@ describe("createLiveStream", () => {
     expect(symbolsOf(latest())).toBe("AAPL,MSFT,BRK-B");
   });
 
-  it("opens nothing for symbols Finnhub doesn't have", () => {
+  it("streams CRYPTO's coins too, but not other crypto or FX", () => {
+    const stream = setup();
+    stream.watch(["BTC-USD", "AAPL", "PEPE-USD", "EURUSD=X"]);
+    vi.advanceTimersByTime(SETTLE);
+    expect(symbolsOf(latest())).toBe("BTC-USD,AAPL");
+  });
+
+  it("opens nothing for symbols no source streams", () => {
     const stream = setup();
     const stop = stream.watch(["^GSPC", "EURUSD=X"]);
     vi.advanceTimersByTime(SETTLE);
@@ -231,5 +246,13 @@ describe("createLiveStream", () => {
     vi.advanceTimersByTime(SETTLE);
     latest().emit("live", ["AAPL"]);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("streams", () => {
+  it("takes US stocks and funds, and CRYPTO's coins", () => {
+    expect([streams("AAPL"), streams("BRK-B"), streams("SPY"), streams("BTC-USD"), streams("DOGE-USD")]).toEqual([true, true, true, true, true]);
+    expect([streams("^GSPC"), streams("EURUSD=X"), streams("GC=F"), streams("PEPE-USD"), streams("VOD.L")]).toEqual([false, false, false, false, false]);
+    expect(isCoin("AAPL")).toBe(false);
   });
 });

@@ -188,6 +188,20 @@ describe("chart", () => {
     ]);
   });
 
+  it("keeps the dividend-adjusted close where Yahoo gives one", async () => {
+    // From XLK's weekly bars on 1 Nov 2026: a dividend since then puts the adjusted close below the close.
+    yahoo.chart.mockResolvedValue(
+      chartResult([
+        bar("2026-09-14T04:00:00Z", 189.6, { adjclose: 189.379 }),
+        bar("2026-09-21T04:00:00Z", 196.27, { adjclose: null }),
+      ]),
+    );
+
+    const [adjusted, unadjusted] = (await chart("XLK", "5Y")).bars;
+    expect(adjusted).toMatchObject({ close: 189.6, adjClose: 189.379 });
+    expect(unadjusted).not.toHaveProperty("adjClose");
+  });
+
   it("asks for the bar size each range calls for, regular session only", async () => {
     yahoo.chart.mockResolvedValue(chartResult([]));
 

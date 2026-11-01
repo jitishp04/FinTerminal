@@ -30,6 +30,8 @@ export interface Bar {
   high: number;
   low: number;
   close: number;
+  /** The close adjusted for dividends paid since, so an ex-dividend drop doesn't read as a loss. Daily and weekly bars only. */
+  adjClose?: number;
   volume: number;
 }
 
@@ -160,6 +162,28 @@ export interface Chart {
   /** Where the range starts. Earlier bars are history, so 200-bar averages cover the whole range. */
   from: number;
   bars: Bar[];
+}
+
+export interface WeeklyClose {
+  /** The Monday the week starts on, in the exchange's time zone, e.g. "2026-10-26". */
+  week: string;
+  /** The week's last close, adjusted for dividends. The latest week's may still be trading. */
+  close: number;
+}
+
+export interface WeeklySeries {
+  symbol: string;
+  /** Oldest first. */
+  weeks: WeeklyClose[];
+}
+
+export interface Rotation {
+  /** SPY, which the sectors are measured against. */
+  benchmark: WeeklySeries;
+  /** The sectors Yahoo answered for, in `SECTORS` order. */
+  sectors: WeeklySeries[];
+  /** The sectors it didn't answer for. */
+  missing: string[];
 }
 
 export interface Profile {

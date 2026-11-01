@@ -6,11 +6,13 @@ import {
   FREQUENCIES,
   type Frequency,
   lookback,
+  type LuckCheck,
   luckCheck,
   ordinal,
   type Outcome,
   type Plan,
   rank,
+  type Ranked,
   type Schedule,
   scheduleLabel,
   simulate,
@@ -197,16 +199,21 @@ function Backtest({ history }: { history: History }) {
           {problem}
         </p>
       )}
+      {results && !chosen && (
+        <p role="status" className="text-muted">
+          No buys fall between {results.range.from} and {history.days[history.days.length - 1].date} on this schedule.
+        </p>
+      )}
       {results && chosen && lump && (
         <>
           <p className="text-muted">
             {results.range.short &&
-              `Yahoo's history for ${history.symbol} starts on ${history.days[0].date}, so this covers ${yearsBetween(results.range.from, chosen.outcome.end)} years. `}
+              `Yahoo's history for ${history.symbol} only goes back to ${history.days[0].date}. `}
             Past results from {chosen.outcome.firstBuy} to {chosen.outcome.end}
             {reinvest && !isIndex ? ", dividends reinvested." : isIndex ? "." : ", dividends kept as cash."}
           </p>
           <Comparison plan={chosen.outcome} planLabel={scheduleLabel(schedule)} lump={lump} />
-          <Schedules results={results} chosen={schedule} />
+          <Schedules ranked={results.ranked} luck={results.luck} chosen={schedule} />
         </>
       )}
       <p className="text-xs text-muted">
@@ -268,15 +275,8 @@ function Signed({ value, children }: { value: number; children: ReactNode }) {
   return <span className={value > 0 ? "text-up" : value < 0 ? "text-down" : undefined}>{children}</span>;
 }
 
-interface Results {
-  range: { from: string };
-  ranked: ReturnType<typeof rank>;
-  luck: ReturnType<typeof luckCheck>;
-}
-
 /** Every schedule's result, how far apart the best and worst were, and whether the first half's best held up. */
-function Schedules({ results, chosen }: { results: Results; chosen: Schedule }) {
-  const { ranked, luck } = results;
+function Schedules({ ranked, luck, chosen }: { ranked: Ranked[]; luck: LuckCheck | undefined; chosen: Schedule }) {
   const best = ranked[0];
   const worst = ranked[ranked.length - 1];
   const gap = (best.outcome.xirr ?? 0) - (worst.outcome.xirr ?? 0);
@@ -339,5 +339,3 @@ function Schedules({ results, chosen }: { results: Results; chosen: Schedule }) 
     </section>
   );
 }
-
-const yearsBetween = (from: string, to: string) => ((Date.parse(to) - Date.parse(from)) / 864e5 / 365.25).toFixed(1);

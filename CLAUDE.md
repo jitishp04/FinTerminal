@@ -51,3 +51,5 @@ src/components/functions/*.tsx   one component per function code
 - `npm run dev`: start at http://localhost:3000
 - `npm test`: Vitest
 - `npm run build` / `npm run lint` / `npm run typecheck` (runs `next typegen` first: route types like `LayoutProps` are generated)
+- `npm run check:keys`: after a build, fails if a value from `.env.local` reached the client files
+- `FAIL_SOURCES=yahoo,sec,fred,finnhub` in `.env.local` forces sources to fail, to try out the panels' failure states

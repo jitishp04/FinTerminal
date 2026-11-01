@@ -8,13 +8,13 @@ import { sma } from "./indicators";
 import { SECTORS } from "./monitors";
 import type { Bar, Chart, Rotation, WeeklyClose, WeeklySeries } from "./types";
 
-export const BENCHMARK = "SPY";
+const BENCHMARK = "SPY";
 
 // Starting values: shorter averages make the map jumpier, longer ones make it lag.
-const TREND_WEEKS = 13;
-const MOMENTUM_WEEKS = 5;
+export const TREND_WEEKS = 13;
+export const MOMENTUM_WEEKS = 5;
 
-/** A year: more than the longest tail needs (28 weeks), so the averages can be tuned without changing the route. */
+/** A year: more than the longest tail needs (29 weeks), so the averages can be tuned without changing the route. */
 export const WEEKS_SENT = 52;
 
 /** Clockwise from top right, the way sectors tend to move through them. */

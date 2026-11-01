@@ -87,6 +87,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "SECT",
   },
   {
+    code: "ROT",
+    title: "Sector rotation",
+    description: "Which sectors are beating the market, fading or turning",
+    keywords: ["rotation", "relative strength", "momentum", "trend"],
+    group: "Market",
+    symbol: "none",
+    example: "ROT",
+  },
+  {
     code: "MOST",
     title: "Top movers",
     description: "Biggest gainers, losers and most active stocks",

@@ -53,6 +53,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `W` | Your watchlist |
 | `WEI` | World indices |
 | `SECT` | Sector heatmap |
+| `ROT` | Sector rotation: trend and momentum against SPY |
 | `MOST` | Top movers |
 | `FX` | Currencies |
 | `CMDTY` | Commodities |

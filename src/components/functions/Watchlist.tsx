@@ -94,6 +94,7 @@ export function Watchlist({ onOpen }: { onOpen: (command: Command) => void }) {
                 symbol={symbol}
                 quote={quotes.get(symbol)}
                 loading={loading}
+                missing={error ? "—" : "No data"}
                 onOpen={() => onOpen({ fn: "GP", symbol, args: [] })}
                 onRemove={() => save(removeSymbol(symbols, symbol))}
               />
@@ -109,11 +110,13 @@ interface RowProps {
   symbol: string;
   quote?: Quote;
   loading: boolean;
+  /** Shown as the last price when there's no quote. */
+  missing: string;
   onOpen: () => void;
   onRemove: () => void;
 }
 
-function Row({ symbol, quote, loading, onOpen, onRemove }: RowProps) {
+function Row({ symbol, quote, loading, missing, onOpen, onRemove }: RowProps) {
   return (
     <tr onClick={onOpen} className="cursor-pointer hover:bg-border">
       <td className="text-left">
@@ -126,7 +129,7 @@ function Row({ symbol, quote, loading, onOpen, onRemove }: RowProps) {
           {symbol}
         </button>
       </td>
-      <QuoteCells quote={quote} loading={loading} missing="No data" />
+      <QuoteCells quote={quote} loading={loading} missing={missing} />
       <td className="hidden @md:table-cell">{quote?.volume ? formatCompact(quote.volume) : "—"}</td>
       <td className="hidden @lg:table-cell">{dayRange(quote)}</td>
       <td className="w-px">

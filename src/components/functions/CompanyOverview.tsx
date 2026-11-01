@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { formatInteger } from "@/lib/format";
 import { keyStats, typeLabel } from "@/lib/keyStats";
 import { QuoteLine } from "./QuoteLine";
+import { SourceError } from "./SourceError";
 import { useProfile } from "./useProfile";
 
 /** DES: what the company or fund is, and its key stats. */
@@ -11,7 +12,7 @@ export function CompanyOverview({ symbol }: { symbol: string }) {
   const profile = useProfile(symbol);
 
   if (profile.isPending) return <p className="text-muted">Loading overview…</p>;
-  if (profile.isError) return <p role="alert">{profile.error.message}</p>;
+  if (profile.isError) return <SourceError error={profile.error} />;
 
   const p = profile.data;
   const site = webLink(p.website);

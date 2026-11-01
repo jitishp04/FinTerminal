@@ -104,21 +104,25 @@ describe("FRED requests", () => {
   it.each([
     [500, { error_code: 500, error_message: "Internal Server Error" }],
     [429, { error_code: 429, error_message: "Too Many Requests.  Exceeded Rate Limit" }],
-  ])("treats a %i as a source failure, with the key nowhere in the error", async (status, body) => {
+  ])("treats a %i as a source failure, with the key nowhere in the error or the log", async (status, body) => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     stubFailure(status, body);
     const error = await rejection(series("UNRATE"));
-    expect(error).not.toBeInstanceOf(ApiError);
-    expect(`${error.message} ${error.stack}`).not.toContain(KEY);
+    expect(error).toMatchObject({ status: 502, message: "FRED isn't responding. Retrying…" });
+    expect(logged).toHaveBeenCalled();
+    for (const [cause] of logged.mock.calls) expect(`${cause} ${(cause as Error).stack}`).not.toContain(KEY);
+    logged.mockRestore();
   });
 
   it("copes with a failure that isn't JSON", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("<html>Bad Gateway</html>", { status: 502 })),
     );
-    const error = await rejection(series("UNRATE"));
-    expect(error).not.toBeInstanceOf(ApiError);
-    expect(error.message).toMatch(/502/);
+    expect(await rejection(series("UNRATE"))).toMatchObject({ status: 502 });
+    expect(String(logged.mock.calls[0][0])).toMatch(/502/);
+    logged.mockRestore();
   });
 });
 

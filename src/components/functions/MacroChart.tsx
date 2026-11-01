@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import type { Overlay } from "@/lib/chartData";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { formatPrice } from "@/lib/format";
 import { MACRO_REFRESH, periodLabel, toChart } from "@/lib/macro";
 import { MACRO_RANGES, type MacroRange, type MacroSeries } from "@/lib/types";
@@ -20,7 +20,7 @@ export function MacroChart({ id }: { id: string }) {
   const series = useQuery({
     queryKey: ["macro", id],
     queryFn: () => fetchApi<MacroSeries>(`/api/macro?series=${encodeURIComponent(id)}`),
-    refetchInterval: MACRO_REFRESH,
+    refetchInterval: pollEvery(MACRO_REFRESH),
     // Fresh until the next poll, so switching windows doesn't refetch it.
     staleTime: MACRO_REFRESH,
   });

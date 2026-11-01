@@ -3,7 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { OVERLAYS, type Overlay } from "@/lib/chartData";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { CHART_RANGES, type Chart, type ChartRange } from "@/lib/types";
 import { CandleChart, OVERLAY_COLORS, type ChartStyle } from "./CandleChart";
 import { QuoteLine } from "./QuoteLine";
@@ -23,7 +23,7 @@ export function PriceChart({ symbol }: { symbol: string }) {
   const chart = useQuery({
     queryKey: ["chart", symbol, range],
     queryFn: () => fetchApi<Chart>(`/api/chart?symbol=${query}&range=${range}`),
-    refetchInterval: chartRefresh,
+    refetchInterval: pollEvery(chartRefresh),
     // Fresh until the next poll, so switching windows doesn't refetch it.
     staleTime: chartRefresh,
     // Keep the last chart on screen while the next symbol or range loads.

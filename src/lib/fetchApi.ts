@@ -8,6 +8,17 @@ export class FetchError extends Error {
   }
 }
 
+/** A 4xx (unknown symbol, bad input) won't change by asking again. */
+export const isClientError = (error: unknown) => error instanceof FetchError && error.status >= 400 && error.status < 500;
+
+const RETRY_EVERY = 10_000;
+
+/** For a query's `refetchInterval`: every `interval`, and sooner after a failure, since the panel says it's retrying. */
+export const pollEvery =
+  (interval: number | false) =>
+  ({ state }: { state: { error: Error | null } }) =>
+    state.error && !isClientError(state.error) ? RETRY_EVERY : interval;
+
 /** GETs one of our API routes and returns its JSON, or throws a FetchError. */
 export async function fetchApi<T>(path: string): Promise<T> {
   let response: Response;

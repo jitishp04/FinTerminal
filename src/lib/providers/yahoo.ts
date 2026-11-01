@@ -5,6 +5,7 @@ import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-ifa
 import { ApiError } from "../api";
 import { cached } from "../cache";
 import type { Bar, Chart, ChartRange, MoverType, Profile, Quote } from "../types";
+import { tracked } from "./health";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
 const yahoo = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
@@ -61,34 +62,38 @@ const samePair = (symbol: string) => symbol.replace(/^USD([A-Z]{3}=X)$/, "$1");
 /** Latest quotes in one Yahoo request, under the symbols asked for. Unknown symbols are left out. */
 export function quote(symbols: string[]): Promise<Quote[]> {
   const unique = [...new Set(symbols)];
-  return cached(`quote:${unique.join(",")}`, QUOTE_TTL, async () => {
-    // Yahoo answers some symbols with a stub (BRK.B). Validating would throw away the whole batch for it.
-    const rows = (await yahoo.quote(unique, {}, { validateResult: false })) as YahooQuote[];
-    const asked = new Map(unique.map((symbol) => [samePair(symbol), symbol]));
-    return rows.flatMap((row) => {
-      const quote = toQuote(row);
-      return quote ? [{ ...quote, symbol: asked.get(samePair(quote.symbol)) ?? quote.symbol }] : [];
-    });
-  });
+  return cached(`quote:${unique.join(",")}`, QUOTE_TTL, () =>
+    tracked("yahoo", async () => {
+      // Yahoo answers some symbols with a stub (BRK.B). Validating would throw away the whole batch for it.
+      const rows = (await yahoo.quote(unique, {}, { validateResult: false })) as YahooQuote[];
+      const asked = new Map(unique.map((symbol) => [samePair(symbol), symbol]));
+      return rows.flatMap((row) => {
+        const quote = toQuote(row);
+        return quote ? [{ ...quote, symbol: asked.get(samePair(quote.symbol)) ?? quote.symbol }] : [];
+      });
+    }),
+  );
 }
 
 /** One list of the day's top US stocks, best ranked first. */
 export function movers(type: MoverType): Promise<Quote[]> {
   const { scrIds, rank } = MOVER_LISTS[type];
-  return cached(`movers:${type}`, MOVERS_TTL, async () => {
-    // Not validated, for the same reason as quote().
-    const options = { scrIds, count: MOVERS_COUNT };
-    const { quotes } = (await yahoo.screener(options, undefined, { validateResult: false })) as {
-      quotes: { regularMarketTime?: number }[];
-    };
-    return quotes
-      .flatMap((row) => {
-        // The same fields as quote(), except that the time comes in epoch seconds.
-        const time = row.regularMarketTime;
-        return toQuote({ ...row, regularMarketTime: time && new Date(time * 1000) } as unknown as YahooQuote) ?? [];
-      })
-      .sort((a, b) => rank(a) - rank(b));
-  });
+  return cached(`movers:${type}`, MOVERS_TTL, () =>
+    tracked("yahoo", async () => {
+      // Not validated, for the same reason as quote().
+      const options = { scrIds, count: MOVERS_COUNT };
+      const { quotes } = (await yahoo.screener(options, undefined, { validateResult: false })) as {
+        quotes: { regularMarketTime?: number }[];
+      };
+      return quotes
+        .flatMap((row) => {
+          // The same fields as quote(), except that the time comes in epoch seconds.
+          const time = row.regularMarketTime;
+          return toQuote({ ...row, regularMarketTime: time && new Date(time * 1000) } as unknown as YahooQuote) ?? [];
+        })
+        .sort((a, b) => rank(a) - rank(b));
+    }),
+  );
 }
 
 /** Price bars for `range`, with the bar size the range calls for, plus history before it. */
@@ -124,15 +129,17 @@ export function profile(symbol: string): Promise<Profile> {
 }
 
 /** Yahoo reports an unknown symbol as a plain Error; answer it with a 404. */
-async function orNotFound<T>(symbol: string, load: () => Promise<T>): Promise<T> {
-  try {
-    return await load();
-  } catch (error) {
-    if (error instanceof Error && /quote not found|no data found/i.test(error.message)) {
-      throw new ApiError(404, `No data for ${symbol}`);
+function orNotFound<T>(symbol: string, load: () => Promise<T>): Promise<T> {
+  return tracked("yahoo", async () => {
+    try {
+      return await load();
+    } catch (error) {
+      if (error instanceof Error && /quote not found|no data found/i.test(error.message)) {
+        throw new ApiError(404, `No data for ${symbol}`);
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
 }
 
 const seconds = (date: Date) => Math.floor(date.getTime() / 1000);

@@ -2,6 +2,7 @@ import { ApiError } from "../api";
 import { cached } from "../cache";
 import { baseForm, isInsiderForm } from "../filings";
 import type { Filing, FinancialPeriod, Financials, Filings } from "../types";
+import { tracked } from "./health";
 import { toFinancials, type CompanyFacts } from "./secFacts";
 
 const WWW = "https://www.sec.gov";
@@ -50,16 +51,18 @@ function waitForSlot(): Promise<void> {
 }
 
 /** One SEC request. Null if the SEC has no such record. */
-async function request<T>(url: string): Promise<T | null> {
-  const agent = process.env.SEC_USER_AGENT;
-  if (!agent) {
-    throw new ApiError(500, "SEC_USER_AGENT isn't set. Add your name and email to .env.local: see .env.example.");
-  }
-  await waitForSlot();
-  const response = await fetch(url, { headers: { "User-Agent": agent } });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`The SEC answered ${response.status} for ${url}`);
-  return response.json() as Promise<T>;
+function request<T>(url: string): Promise<T | null> {
+  return tracked("sec", async () => {
+    const agent = process.env.SEC_USER_AGENT;
+    if (!agent) {
+      throw new ApiError(500, "SEC_USER_AGENT isn't set. Add your name and email to .env.local: see .env.example.");
+    }
+    await waitForSlot();
+    const response = await fetch(url, { headers: { "User-Agent": agent } });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`The SEC answered ${response.status} for ${url}`);
+    return response.json() as Promise<T>;
+  });
 }
 
 /** Ticker to company. Includes some funds, such as SPY, but they have no statements. */

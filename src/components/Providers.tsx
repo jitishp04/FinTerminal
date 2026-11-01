@@ -2,18 +2,17 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { FetchError } from "@/lib/fetchApi";
+import { isClientError, pollEvery } from "@/lib/fetchApi";
 
 let browserQueryClient: QueryClient | undefined;
-
-/** A 4xx (unknown symbol, bad input) won't change by asking again. */
-const isClientError = (error: unknown) => error instanceof FetchError && error.status >= 400 && error.status < 500;
 
 function newQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: (failures, error) => failures < 2 && !isClientError(error),
+        // Polling does the retrying, so a failure shows at once and stays on screen between tries.
+        retry: false,
+        refetchInterval: pollEvery(false),
         refetchOnWindowFocus: (query) => !isClientError(query.state.error),
       },
     },

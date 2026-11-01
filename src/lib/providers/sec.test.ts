@@ -125,7 +125,7 @@ describe("SEC requests", () => {
 
     const error = await rejection(financials("AAPL", "annual"));
 
-    expect(error).not.toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 502, message: "SEC EDGAR isn't responding. Retrying…" });
   });
 });
 

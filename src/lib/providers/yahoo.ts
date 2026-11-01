@@ -165,7 +165,10 @@ export function toQuote(q: YahooQuote): Quote | undefined {
   };
 }
 
-/** Drops Yahoo's empty bars (FX and futures have gaps) and fills a missing open/high/low with the close. */
+/**
+ * Drops Yahoo's empty bars (FX and futures have gaps) and fills a missing open/high/low with the close.
+ * Keeps the dividend-adjusted close where Yahoo has one.
+ */
 export function toBars(rows: ChartResultArrayQuote[]): Bar[] {
   return rows.flatMap((r) => {
     if (r.close == null) return [];
@@ -176,6 +179,7 @@ export function toBars(rows: ChartResultArrayQuote[]): Bar[] {
         high: r.high ?? r.close,
         low: r.low ?? r.close,
         close: r.close,
+        ...(r.adjclose != null && { adjClose: r.adjclose }),
         volume: r.volume ?? 0,
       },
     ];

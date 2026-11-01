@@ -47,6 +47,10 @@ const SectorHeatmap = dynamic(() => import("./functions/SectorHeatmap").then((m)
   ssr: false,
   loading: () => <p className="text-muted">Loading sectors…</p>,
 });
+const SectorRotation = dynamic(() => import("./functions/SectorRotation").then((m) => m.SectorRotation), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading sectors…</p>,
+});
 const TopMovers = dynamic(() => import("./functions/TopMovers").then((m) => m.TopMovers), {
   ssr: false,
   loading: () => <p className="text-muted">Loading movers…</p>,
@@ -66,6 +70,7 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "CURV") return <YieldCurve />;
   if (command.fn === "W") return <Watchlist onOpen={onOpen} />;
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
+  if (command.fn === "ROT") return <SectorRotation onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;
   const monitor = MONITORS[command.fn];
   return monitor ? <QuoteMonitor groups={monitor} onOpen={onOpen} /> : null;

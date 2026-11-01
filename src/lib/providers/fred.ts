@@ -3,6 +3,7 @@ import { cached } from "../cache";
 import { TENORS, toCurve } from "../curve";
 import { INDICATORS, toIndicator } from "../macro";
 import type { MacroIndicator, MacroSeries, Observation, YieldCurve } from "../types";
+import { tracked } from "./health";
 
 const BASE = "https://api.stlouisfed.org/fred";
 
@@ -21,20 +22,22 @@ interface FredObservations {
 }
 
 /** One FRED request. The key is in the URL, so the URL stays out of the errors, which reach the server's log. */
-async function request<T>(path: string, id: string): Promise<T> {
-  const key = process.env.FRED_API_KEY;
-  if (!key) throw new ApiError(401, "Add FRED_API_KEY to .env.local, then reload this page.");
+function request<T>(path: string, id: string): Promise<T> {
+  return tracked("fred", async () => {
+    const key = process.env.FRED_API_KEY;
+    if (!key) throw new ApiError(401, "Add FRED_API_KEY to .env.local, then reload this page.");
 
-  const response = await fetch(`${BASE}/${path}?series_id=${id}&api_key=${key}&file_type=json`);
-  if (response.ok) return response.json() as Promise<T>;
+    const response = await fetch(`${BASE}/${path}?series_id=${id}&api_key=${key}&file_type=json`);
+    if (response.ok) return response.json() as Promise<T>;
 
-  const body: { error_message?: string } = await response.json().catch(() => ({}));
-  const message = body.error_message ?? "";
-  if (message.includes("api_key")) {
-    throw new ApiError(401, "FRED refused FRED_API_KEY. Check it in .env.local, then reload this page.");
-  }
-  if (NO_MATCH.test(message)) throw new ApiError(404, `FRED has no series ${id}.`);
-  throw new Error(`FRED answered ${response.status} for ${id}`);
+    const body: { error_message?: string } = await response.json().catch(() => ({}));
+    const message = body.error_message ?? "";
+    if (message.includes("api_key")) {
+      throw new ApiError(401, "FRED refused FRED_API_KEY. Check it in .env.local, then reload this page.");
+    }
+    if (NO_MATCH.test(message)) throw new ApiError(404, `FRED has no series ${id}.`);
+    throw new Error(`FRED answered ${response.status} for ${id}`);
+  });
 }
 
 const decimalsOf = (value: string) => value.split(".")[1]?.length ?? 0;

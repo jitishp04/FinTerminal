@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { bpChange, invertedSegments } from "@/lib/curve";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { formatChange, formatPrice } from "@/lib/format";
 import { MACRO_REFRESH } from "@/lib/macro";
 import type { YieldCurve as Curve } from "@/lib/types";
@@ -18,7 +18,7 @@ export function YieldCurve() {
   const curve = useQuery({
     queryKey: ["curve"],
     queryFn: () => fetchApi<Curve>("/api/curve"),
-    refetchInterval: MACRO_REFRESH,
+    refetchInterval: pollEvery(MACRO_REFRESH),
     // Fresh until the next poll, so switching windows doesn't refetch it.
     staleTime: MACRO_REFRESH,
   });

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
-import type { Command } from "@/lib/commands";
+import { formatCommand, type Command } from "@/lib/commands";
 import { PANEL_COUNT, parseLayout, serializeLayout, type Layout } from "@/lib/layout";
 import { getLayoutSnapshot, getServerLayoutSnapshot, saveLayout, subscribeLayout } from "@/lib/layoutStore";
 import { CommandBar } from "./CommandBar";
 import { FunctionView } from "./FunctionView";
 import { Panel } from "./Panel";
+import { PanelBoundary } from "./PanelBoundary";
 
 export function Terminal() {
   const raw = useSyncExternalStore(subscribeLayout, getLayoutSnapshot, getServerLayoutSnapshot);
@@ -67,7 +68,9 @@ export function Terminal() {
             onFocus={() => focus(i)}
             onToggleMaximize={() => setMaximized(maximized === i ? null : i)}
           >
-            <FunctionView command={command} onOpen={(next) => open(i, next)} />
+            <PanelBoundary command={formatCommand(command)}>
+              <FunctionView command={command} onOpen={(next) => open(i, next)} />
+            </PanelBoundary>
           </Panel>
         ))}
       </main>

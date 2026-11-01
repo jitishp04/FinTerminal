@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { Command } from "@/lib/commands";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { formatIndicator, MACRO_REFRESH, sparkPoints } from "@/lib/macro";
 import type { MacroIndicator } from "@/lib/types";
 import { MacroError } from "./MacroError";
@@ -16,7 +16,7 @@ export function MacroDashboard({ onOpen }: { onOpen: (command: Command) => void 
   const dashboard = useQuery({
     queryKey: ["macro"],
     queryFn: async () => (await fetchApi<{ indicators: MacroIndicator[] }>("/api/macro")).indicators,
-    refetchInterval: MACRO_REFRESH,
+    refetchInterval: pollEvery(MACRO_REFRESH),
     // Fresh until the next poll, so switching windows doesn't refetch it.
     staleTime: MACRO_REFRESH,
   });

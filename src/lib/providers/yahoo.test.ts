@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError } from "../api";
 import { clearCache } from "../cache";
 import { chart, movers, profile, quote, sessionStart } from "./yahoo";
 
@@ -230,7 +229,10 @@ describe("chart", () => {
 
   it("passes other failures through", async () => {
     yahoo.chart.mockRejectedValue(new Error("fetch failed"));
-    await expect(chart("AAPL", "1Y")).rejects.not.toBeInstanceOf(ApiError);
+    await expect(chart("AAPL", "1Y")).rejects.toMatchObject({
+      status: 502,
+      message: "Yahoo Finance isn't responding. Retrying…",
+    });
   });
 });
 

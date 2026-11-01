@@ -9,7 +9,7 @@ const QUOTE_REFRESH = 15_000;
 
 /** Name, last price and the day's change, polled. Panels showing one symbol share the request. */
 export function QuoteLine({ symbol }: { symbol: string }) {
-  const { data: quote } = useQuery({
+  const { data: quote, error } = useQuery({
     queryKey: ["quote", symbol],
     queryFn: async () =>
       (await fetchApi<{ quotes: Quote[] }>(`/api/quote?symbols=${encodeURIComponent(symbol)}`)).quotes[0] ?? null,
@@ -18,7 +18,9 @@ export function QuoteLine({ symbol }: { symbol: string }) {
     staleTime: QUOTE_REFRESH,
   });
 
-  if (!quote) return <p className="truncate text-muted">{quote === null ? `No quote for ${symbol}` : symbol}</p>;
+  if (!quote) {
+    return <p className="truncate text-muted">{quote === null ? `No quote for ${symbol}` : (error?.message ?? symbol)}</p>;
+  }
   const decimals = priceDecimals(quote.price);
   const change = quote.change ?? 0;
   const tone = change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted";
@@ -34,6 +36,11 @@ export function QuoteLine({ symbol }: { symbol: string }) {
         </span>
       )}
       {quote.currency && <span className="text-xs text-muted">{quote.currency}</span>}
+      {error && (
+        <span title={error.message} className="text-xs text-down">
+          out of date
+        </span>
+      )}
     </p>
   );
 }

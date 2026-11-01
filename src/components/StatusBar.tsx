@@ -1,7 +1,20 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+import { fetchApi } from "@/lib/fetchApi";
+import { formatUpdated } from "@/lib/format";
 import { isUsMarketOpen } from "@/lib/market";
+import type { SourceHealth } from "@/lib/sources";
+
+const HEALTH_REFRESH = 10_000;
+
+const DOTS: Record<SourceHealth["state"], string> = {
+  ok: "bg-up",
+  down: "bg-down",
+  idle: "bg-muted",
+  off: "border border-muted",
+};
 
 // The current time in whole seconds; null while rendering on the server.
 function subscribeClock(onTick: () => void) {
@@ -22,6 +35,41 @@ const HINTS = [
   ["Double-click title", "maximize"],
 ] as const;
 
+/** A source's status in words: for a narrow bar's tooltip, and for screen readers. */
+function describe({ name, state, lastOk }: SourceHealth, now: Date | null): string {
+  const answered = lastOk && now ? `, last answered ${formatUpdated(lastOk / 1000, now)}` : "";
+  if (state === "ok") return `${name}: working${answered}`;
+  if (state === "down") return `${name}: not responding${answered}`;
+  if (state === "off") return `${name}: needs a setting in .env.local`;
+  return `${name}: not used yet`;
+}
+
+function Sources({ now }: { now: Date | null }) {
+  const health = useQuery({
+    queryKey: ["health"],
+    queryFn: async () => (await fetchApi<{ sources: SourceHealth[] }>("/api/health")).sources,
+    refetchInterval: HEALTH_REFRESH,
+  });
+
+  if (health.isError) return <span className="text-down">SERVER UNREACHABLE</span>;
+  return (
+    <ul aria-label="Data sources" className="hidden items-center gap-3 md:flex">
+      {health.data?.map((source) => (
+        <li key={source.id} title={describe(source, now)} className="flex items-center gap-1.5">
+          <span aria-hidden className={`size-2 rounded-full ${DOTS[source.state]}`} />
+          <span aria-hidden>{source.id.toUpperCase()}</span>
+          <span className="sr-only">{describe(source, now)}</span>
+          <span aria-hidden className={`hidden xl:inline ${source.state === "down" ? "text-down" : "text-foreground"}`}>
+            {source.state === "ok" && source.lastOk && now ? formatUpdated(source.lastOk / 1000, now) : ""}
+            {source.state === "down" ? "DOWN" : ""}
+            {source.state === "off" ? "NO KEY" : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function StatusBar() {
   const seconds = useSyncExternalStore(subscribeClock, getSeconds, getServerSeconds);
   const now = seconds === null ? null : new Date(seconds * 1000);
@@ -29,17 +77,21 @@ export function StatusBar() {
 
   return (
     <footer className="flex items-center gap-4 border-t border-border bg-panel px-3 py-0.5 whitespace-nowrap text-muted">
-      <ul aria-label="Shortcuts" className="hidden items-center gap-3 lg:flex">
+      <ul aria-label="Shortcuts" className="hidden items-center gap-3 2xl:flex">
         {HINTS.map(([key, action]) => (
           <li key={key}>
             <kbd className="rounded-sm border border-border px-1 font-mono text-foreground">{key}</kbd> {action}
           </li>
         ))}
       </ul>
-      <span className="ml-auto">
+      <Sources now={now} />
+      <span title="Yahoo and Finnhub prices can lag the market, by 15 minutes or more on some exchanges." className="hidden lg:inline">
+        PRICES MAY BE DELAYED
+      </span>
+      <span className="ml-auto hidden sm:inline">
         LOCAL <span className="text-foreground">{now ? LOCAL.format(now) : "--:--:--"}</span>
       </span>
-      <span>
+      <span className="ml-auto sm:ml-0">
         NEW YORK <span className="text-foreground">{now ? NEW_YORK.format(now) : "--:--:--"}</span>
       </span>
       <span>

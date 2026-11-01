@@ -225,6 +225,39 @@ export interface Chart {
   bars: Bar[];
 }
 
+/** One option contract, as Yahoo quotes it, 15 minutes delayed. */
+export interface OptionContract {
+  /** The OCC symbol, e.g. "AAPL261120C00275000". */
+  contract: string;
+  strike: number;
+  bid?: number;
+  ask?: number;
+  last?: number;
+  /** The last price's change on the day. */
+  change?: number;
+  volume?: number;
+  openInterest?: number;
+  /** Yahoo's, as a fraction a year: 0.32 means 32%. */
+  impliedVolatility?: number;
+  /** When it last traded, in epoch seconds. */
+  lastTrade?: number;
+}
+
+/** One expiration's calls and puts on a stock, fund or index. */
+export interface OptionChain {
+  symbol: string;
+  currency?: string;
+  /** The underlying's last price, from the same answer. */
+  price: number;
+  /** Every expiration Yahoo lists, nearest first, e.g. "2026-11-20". */
+  expirations: string[];
+  /** The one these contracts expire on. */
+  expiration: string;
+  /** Lowest strike first. Calls and puts need not have the same strikes. */
+  calls: OptionContract[];
+  puts: OptionContract[];
+}
+
 /** What a DCF starts from, each with where it came from. Money is in US dollars, as the SEC has it. */
 export interface DcfInputs {
   symbol: string;

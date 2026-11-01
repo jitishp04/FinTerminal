@@ -35,6 +35,10 @@ const DcfValuation = dynamic(() => import("./functions/DcfValuation").then((m) =
   ssr: false,
   loading: () => <p className="text-muted">Loading filings and prices…</p>,
 });
+const OptionsMonitor = dynamic(() => import("./functions/OptionsMonitor").then((m) => m.OptionsMonitor), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading the option chain…</p>,
+});
 const NewsFeed = dynamic(() => import("./functions/NewsFeed").then((m) => m.NewsFeed), {
   ssr: false,
   loading: () => <p className="text-muted">Loading headlines…</p>,
@@ -81,6 +85,8 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "INS" && command.symbol) return <InsiderActivity symbol={command.symbol} />;
   if (command.fn === "DCA" && command.symbol) return <DcaBacktest symbol={command.symbol} />;
   if (command.fn === "DCF" && command.symbol) return <DcfValuation symbol={command.symbol} />;
+  // Keyed, so another symbol starts from its own nearest expiration.
+  if (command.fn === "OMON" && command.symbol) return <OptionsMonitor key={command.symbol} symbol={command.symbol} />;
   if (command.fn === "ECO") {
     return command.args[0] ? <MacroChart id={command.args[0]} /> : <MacroDashboard onOpen={onOpen} />;
   }

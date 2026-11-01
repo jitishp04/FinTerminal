@@ -143,7 +143,8 @@ function Chain({ chain, allStrikes, side, loading }: { chain: OptionChain; allSt
   return (
     // Keeps a usable height in a short panel, which then scrolls to it.
     <div ref={box} aria-busy={loading} className={`min-h-40 flex-1 overflow-auto ${loading ? "opacity-60" : ""}`}>
-      <table className="w-full text-right whitespace-nowrap tabular-nums [&_td]:px-1 [&_td]:py-0.5 [&_th]:px-1 [&_th]:py-0.5 [&_th]:font-normal">
+      {/* Tighter cells in a phone-width panel, so every column fits. */}
+      <table className="w-full text-right whitespace-nowrap tabular-nums [&_td]:px-1 [&_td]:py-0.5 [&_th]:px-1 [&_th]:py-0.5 [&_th]:font-normal @max-md:[&_td]:px-0.5! @max-md:[&_th]:px-0.5!">
         <thead className="sticky top-0 bg-background text-xs text-muted">
           {/* One cell a column, not a span: a span counts the columns a narrow panel hides. */}
           <tr className="tracking-wider uppercase">

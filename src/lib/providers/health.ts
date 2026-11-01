@@ -13,9 +13,12 @@ const NEEDS: Partial<Record<SourceId, string>> = {
   finnhub: "FINNHUB_API_KEY",
 };
 
-const outcomes = new Map<SourceId, Outcome>();
+// On globalThis, because a stream hub is: Next's dev server reloads this module when it changes, and a hub goes on using the copy it started with.
+const shared = globalThis as typeof globalThis & { sourceOutcomes?: Map<SourceId, Outcome> };
+const outcomes = (shared.sourceOutcomes ??= new Map<SourceId, Outcome>());
 
-function record(source: SourceId, ok: boolean) {
+/** Notes how a source's latest call went, or that a stream is still talking. */
+export function record(source: SourceId, ok: boolean) {
   outcomes.set(source, { ok, lastOk: ok ? Date.now() : outcomes.get(source)?.lastOk });
 }
 

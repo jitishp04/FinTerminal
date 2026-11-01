@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLiveStream, isCoin, SETTLE, type Source, streams, withTrade } from "./live";
+import { createLiveStream, isCoin, movingNow, SETTLE, type Source, streams, withTrade } from "./live";
 import { MAX_QUOTE_SYMBOLS, type Quote } from "./types";
 
 // Monday 2 November 2026 in New York, on Eastern Standard Time: 09:30 there is 14:30 UTC.
@@ -246,6 +246,22 @@ describe("createLiveStream", () => {
     vi.advanceTimersByTime(SETTLE);
     latest().emit("live", ["AAPL"]);
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("movingNow", () => {
+  const live = new Set(["AAPL", "SPY", "BTC-USD"]);
+
+  it("counts every streaming symbol in the regular session", () => {
+    expect(movingNow(live, true)).toBe(3);
+  });
+
+  it("counts only coins with the market closed, as a stock's price can't move", () => {
+    expect(movingNow(live, false)).toBe(1);
+  });
+
+  it("is 0 when only stocks stream and the market is closed", () => {
+    expect(movingNow(new Set(["AAPL"]), false)).toBe(0);
   });
 });
 

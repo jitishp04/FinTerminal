@@ -1,7 +1,7 @@
 // Live trades over one websocket per source, each shared by every browser tab. A Feed says how a source talks.
 import { SOURCES, type SourceId } from "../sources";
 import type { Trade } from "../types";
-import { tracked } from "./health";
+import { record, tracked } from "./health";
 
 /** Trades come many a second; watchers get each symbol's latest this often. */
 export const FLUSH_EVERY = 1000;
@@ -102,7 +102,10 @@ export function createHub(feed: Feed) {
       return;
     }
     // The socket works, so a later drop starts its retries afresh.
-    if (reading.alive) retry = RETRY_FIRST;
+    if (reading.alive) {
+      retry = RETRY_FIRST;
+      record(feed.source, true);
+    }
     for (const trade of reading.trades ?? []) {
       const last = pending.get(trade.symbol);
       if (streamed.has(trade.symbol) && (!last || trade.time >= last.time)) pending.set(trade.symbol, trade);

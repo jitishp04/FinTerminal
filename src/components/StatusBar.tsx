@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { formatUpdated } from "@/lib/format";
+import { movingNow } from "@/lib/live";
 import { isUsMarketOpen } from "@/lib/market";
 import type { SourceHealth } from "@/lib/sources";
 import { useLiveSnapshot } from "./functions/useLive";
@@ -71,9 +72,9 @@ function Sources({ now }: { now: Date | null }) {
   );
 }
 
-/** How many symbols stream, while any do. */
-function Live() {
-  const { size } = useLiveSnapshot().live;
+/** How many symbols move with each trade right now, while any do. */
+function Live({ marketOpen }: { marketOpen: boolean }) {
+  const size = movingNow(useLiveSnapshot().live, marketOpen);
   if (size === 0) return null;
   return (
     <span
@@ -100,7 +101,7 @@ export function StatusBar() {
         ))}
       </ul>
       <Sources now={now} />
-      <Live />
+      <Live marketOpen={open} />
       <span title="Yahoo and Finnhub prices can lag the market, by 15 minutes or more on some exchanges." className="hidden lg:inline">
         PRICES MAY BE DELAYED
       </span>

@@ -17,6 +17,10 @@ export const isCoin = (symbol: string) => COINS.has(symbol);
 /** Whether any source streams this symbol. */
 export const streams = (symbol: string) => covers(symbol) || isCoin(symbol);
 
+/** How many streaming symbols can move now: coins always, stocks and funds only in the regular session. */
+export const movingNow = (live: ReadonlySet<string>, marketOpen: boolean) =>
+  marketOpen ? live.size : [...live].filter(isCoin).length;
+
 // What Yahoo calls a US market after the close: its quote then is the day's close.
 const AFTER_THE_CLOSE = new Set(["POST", "POSTPOST", "CLOSED"]);
 

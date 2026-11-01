@@ -77,7 +77,7 @@ function Trades({ symbol }: { symbol: string }) {
         <table className="w-full text-right whitespace-nowrap [&_td]:px-1 [&_td]:py-0.5 [&_th]:px-1 [&_th]:py-0.5 [&_th]:font-normal">
           <thead className="sticky top-0 bg-background text-xs text-muted">
             <tr className="border-b border-border">
-              <th scope="col" className="hidden text-left @md:table-cell">
+              <th scope="col" className="hidden text-left @xl:table-cell">
                 Date
               </th>
               <th scope="col" className="text-left">
@@ -87,7 +87,7 @@ function Trades({ symbol }: { symbol: string }) {
                 Transaction
               </th>
               <th scope="col">Shares</th>
-              <th scope="col" className="hidden @md:table-cell">
+              <th scope="col" className="hidden @xl:table-cell">
                 Price
               </th>
               <th scope="col">Value</th>
@@ -127,7 +127,7 @@ function Row({ trade }: { trade: InsiderTrade }) {
   );
   return (
     <tr>
-      <td className="hidden text-left @md:table-cell">{link}</td>
+      <td className="hidden text-left @xl:table-cell">{link}</td>
       {/* Takes the spare width, so a long name is what gives way. */}
       <td className="w-full max-w-0 text-left">
         <span className="block truncate" title={insider}>
@@ -138,12 +138,12 @@ function Row({ trade }: { trade: InsiderTrade }) {
         </span>
       </td>
       {/* In a narrow panel the name may wrap, and the date sits under it. */}
-      <td className="text-left whitespace-normal @md:whitespace-nowrap">
+      <td className="text-left whitespace-normal @xl:whitespace-nowrap">
         <span className={TONE[code]}>{codeName(code)}</span>
-        <span className="block text-xs @md:hidden">{link}</span>
+        <span className="block text-xs @xl:hidden">{link}</span>
       </td>
       <td className={TONE[code]}>{`${acquired ? "+" : "-"}${formatInteger(shares)}`}</td>
-      <td className="hidden @md:table-cell">{price === undefined ? "—" : formatPrice(price, 2)}</td>
+      <td className="hidden @xl:table-cell">{price === undefined ? "—" : formatPrice(price, 2)}</td>
       <td>{value === undefined ? "—" : `$${formatCompact(value)}`}</td>
       <td className="hidden text-muted @2xl:table-cell">{sharesAfter === undefined ? "—" : formatInteger(sharesAfter)}</td>
     </tr>

@@ -71,6 +71,10 @@ const SectorRotation = dynamic(() => import("./functions/SectorRotation").then((
   ssr: false,
   loading: () => <p className="text-muted">Loading sectors…</p>,
 });
+const EquityScreener = dynamic(() => import("./functions/EquityScreener").then((m) => m.EquityScreener), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading the screener…</p>,
+});
 const TopMovers = dynamic(() => import("./functions/TopMovers").then((m) => m.TopMovers), {
   ssr: false,
   loading: () => <p className="text-muted">Loading movers…</p>,
@@ -95,6 +99,7 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "ROT") return <SectorRotation onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;
+  if (command.fn === "EQS") return <EquityScreener onOpen={onOpen} />;
   // Keyed, so a symbol's news and the market's keep their own topic and scroll.
   if (command.fn === "N") return <NewsFeed key={command.symbol ?? ""} symbol={command.symbol} />;
   const monitor = MONITORS[command.fn];

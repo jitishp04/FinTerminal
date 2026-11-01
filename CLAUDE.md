@@ -39,14 +39,14 @@ src/components/functions/*.tsx   one component per function code
 ## Data sources
 | Data | Source | Key |
 |---|---|---|
-| Quotes, charts, profile, movers, option chains (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
+| Quotes, charts, profile, movers, option chains, stock screens (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
 | Quote fallback (US stocks) | Finnhub | `FINNHUB_API_KEY` |
 | Live trades (US stocks and funds) | Finnhub websocket, one per server, fanned out over SSE (`/api/stream`) | `FINNHUB_API_KEY` |
 | Financial statements, filings, insider Form 4s | SEC EDGAR (≤10 req/s) | `SEC_USER_AGENT` (required contact header) |
 | Macro series, Treasury yield curve | FRED | `FRED_API_KEY` |
 
 ## Function codes
-`<SYM> GP` chart · `<SYM> DES` description · `<SYM> FA` financials · `<SYM> CF` filings · `<SYM> INS` insiders · `<SYM> DCA` DCA backtest · `<SYM> DCF` DCF valuation · `<SYM> OMON` options chain · `W` watchlist · `WEI` world indices · `SECT` sectors · `ROT` sector rotation · `MOST` movers · `N` / `<SYM> N` news · `FX` currencies · `CMDTY` commodities · `ECO [FRED_ID]` macro · `CURV` yield curve · `HELP`
+`<SYM> GP` chart · `<SYM> DES` description · `<SYM> FA` financials · `<SYM> CF` filings · `<SYM> INS` insiders · `<SYM> DCA` DCA backtest · `<SYM> DCF` DCF valuation · `<SYM> OMON` options chain · `W` watchlist · `WEI` world indices · `SECT` sectors · `ROT` sector rotation · `MOST` movers · `EQS` stock screener · `N` / `<SYM> N` news · `FX` currencies · `CMDTY` commodities · `ECO [FRED_ID]` macro · `CURV` yield curve · `HELP`
 
 ## Commands
 - `npm run dev`: start at http://localhost:3000

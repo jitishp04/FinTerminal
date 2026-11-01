@@ -225,6 +225,21 @@ export interface Chart {
   bars: Bar[];
 }
 
+/** A market's close for one week. */
+export type WeekClose = Pick<Bar, "time" | "close">;
+
+/** A symbol's whole history in weeks. A week's `time` is its Monday at 00:00 UTC. */
+export interface Weekly {
+  symbol: string;
+  currency?: string;
+  weeks: Bar[];
+}
+
+/** What THS draws: a symbol's weeks, and those of the market it's measured against. */
+export interface Thesis extends Weekly {
+  benchmark: { symbol: string; name: string; weeks: WeekClose[] };
+}
+
 /** One option contract, as Yahoo quotes it, 15 minutes delayed. */
 export interface OptionContract {
   /** The OCC symbol, e.g. "AAPL261120C00275000". */

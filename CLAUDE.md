@@ -47,7 +47,7 @@ src/components/functions/*.tsx   one component per function code
 | Macro series, Treasury yield curve | FRED | `FRED_API_KEY` |
 
 ## Function codes
-`<SYM> GP` chart · `<SYM> DES` description · `<SYM> FA` financials · `<SYM> CF` filings · `<SYM> INS` insiders · `<SYM> DCA` DCA backtest · `<SYM> DCF` DCF valuation · `<SYM> OMON` options chain · `W` watchlist · `WEI` world indices · `SECT` sectors · `ROT` sector rotation · `MOST` movers · `EQS` stock screener · `N` / `<SYM> N` news · `FX` currencies · `CRYPTO` crypto · `CMDTY` commodities · `ECO [FRED_ID]` macro · `CURV` yield curve · `HELP`
+`<SYM> GP` chart · `<SYM> DES` description · `<SYM> FA` financials · `<SYM> CF` filings · `<SYM> INS` insiders · `<SYM> DCA` DCA backtest · `<SYM> DCF` DCF valuation · `<SYM> THS` thesis check · `<SYM> OMON` options chain · `W` watchlist · `WEI` world indices · `SECT` sectors · `ROT` sector rotation · `MOST` movers · `EQS` stock screener · `N` / `<SYM> N` news · `FX` currencies · `CRYPTO` crypto · `CMDTY` commodities · `ECO [FRED_ID]` macro · `CURV` yield curve · `HELP`
 
 ## Commands
 - `npm run dev`: start at http://localhost:3000

@@ -35,6 +35,10 @@ const DcfValuation = dynamic(() => import("./functions/DcfValuation").then((m) =
   ssr: false,
   loading: () => <p className="text-muted">Loading filings and prices…</p>,
 });
+const ThesisCheck = dynamic(() => import("./functions/ThesisCheck").then((m) => m.ThesisCheck), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading weekly history…</p>,
+});
 const OptionsMonitor = dynamic(() => import("./functions/OptionsMonitor").then((m) => m.OptionsMonitor), {
   ssr: false,
   loading: () => <p className="text-muted">Loading the option chain…</p>,
@@ -89,6 +93,8 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "INS" && command.symbol) return <InsiderActivity symbol={command.symbol} />;
   if (command.fn === "DCA" && command.symbol) return <DcaBacktest symbol={command.symbol} />;
   if (command.fn === "DCF" && command.symbol) return <DcfValuation symbol={command.symbol} />;
+  // Keyed, so another symbol starts from its own first view.
+  if (command.fn === "THS" && command.symbol) return <ThesisCheck key={command.symbol} symbol={command.symbol} />;
   // Keyed, so another symbol starts from its own nearest expiration.
   if (command.fn === "OMON" && command.symbol) return <OptionsMonitor key={command.symbol} symbol={command.symbol} />;
   if (command.fn === "ECO") {

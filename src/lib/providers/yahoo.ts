@@ -8,6 +8,7 @@ import { cached } from "../cache";
 import { wallClock } from "../chartData";
 import { parseRss } from "../news";
 import type { ScreenId } from "../screens";
+import { toWeeks } from "../thesis";
 import type {
   Bar,
   Chart,
@@ -21,6 +22,7 @@ import type {
   Quote,
   Screen,
   ScreenRow,
+  Weekly,
 } from "../types";
 import { tracked } from "./health";
 
@@ -41,6 +43,8 @@ const NEWS_TTL = 4 * MINUTE;
 const NEWS_FEED = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 // Daily closes change once a day, and a full history is a big download.
 const HISTORY_TTL = 4 * 60 * MINUTE;
+// Under the THS panel's 10-minute refresh, for the same reason as quotes.
+const WEEKLY_TTL = 9 * MINUTE;
 // Under the options panel's 60 s poll, for the same reason as quotes.
 const OPTIONS_TTL = 50 * SECOND;
 // Under the screener's 5-minute refresh.
@@ -181,6 +185,19 @@ export function history(symbol: string): Promise<History> {
         events: "div",
       });
       return toHistory(meta, quotes, events?.dividends ?? [], new Date());
+    }),
+  );
+}
+
+/**
+ * A symbol's whole history in weeks, this week so far included. They're built from daily bars:
+ * Yahoo's own weekly data ends with a stray bar of the latest day alone.
+ */
+export function weekly(symbol: string): Promise<Weekly> {
+  return cached(`weekly:${symbol}`, WEEKLY_TTL, () =>
+    orNotFound(symbol, async () => {
+      const { meta, quotes } = await yahoo.chart(symbol, { period1: new Date(0), interval: "1d", includePrePost: false });
+      return { symbol: meta.symbol, currency: meta.currency, weeks: toWeeks(toBars(quotes), meta.exchangeTimezoneName) };
     }),
   );
 }

@@ -1,0 +1,68 @@
+[
+  {
+    "category": "company",
+    "datetime": 1793513086,
+    "headline": "Wall Street Week Ahead",
+    "id": 143374329,
+    "image": "",
+    "related": "AAPL",
+    "source": "SeekingAlpha",
+    "summary": "Wall Streetâs big week: midterm elections, October jobs report and key earnings from Apple, AMD and Uber.",
+    "url": "https://finnhub.io/api/news?id=5e8a66c2ae9627fb2b37b602e1abc9cb2514651b3b144ae478cdac85043c7610"
+  },
+  {
+    "category": "company",
+    "datetime": 1793510210,
+    "headline": "ETB: 8.5% Yield With Widest Discount In 15 Years",
+    "id": 143374173,
+    "image": "",
+    "related": "AAPL",
+    "source": "SeekingAlpha",
+    "summary": "ETB fund offers high current income and potential capital appreciation at its widest discount in 15 years. Here's what investors need to know about the ETB fund.",
+    "url": "https://finnhub.io/api/news?id=1c04d1deb1d90fc69caa8dd53434137c779aa07bded49b7f7a07beb380b0ca6f"
+  },
+  {
+    "category": "company",
+    "datetime": 1793518367,
+    "headline": "Apple CEO John Ternus Says ‘I Really Like Where We're At’ in AI Race: Won't ‘Ship AI for AI's Sake’",
+    "id": 143374036,
+    "image": "",
+    "related": "AAPL",
+    "source": "Yahoo",
+    "summary": "Apple Inc. (NASDAQ:AAPL) CEO John Ternus has defended the company’s artificial intelligence (AI) strategy, pushing back on criticism that the iPhone maker has fallen behind competitors in the AI race.",
+    "url": "https://finnhub.io/api/news?id=29031ccb906f214f414b19f341f8af7b9e77ea1f79f183033b1c0301a81821ec"
+  },
+  {
+    "category": "company",
+    "datetime": 1793501054,
+    "headline": "Dow Jones Futures Loom After Stock Market Sell-Off; Apple, Palantir, Midterm Elections In Focus",
+    "id": 143371370,
+    "image": "",
+    "related": "AAPL",
+    "source": "Yahoo",
+    "summary": "Techs led another stock market sell-off. It's a time to be defensive. Apple, Palantir, jobs and midterm elections loom.",
+    "url": "https://finnhub.io/api/news?id=125e48825bd1f07d49eaa70961ebe0aab5f08a9db0ad3183a4907b8fa56974a2"
+  },
+  {
+    "category": "company",
+    "datetime": 1793444400,
+    "headline": "Apple Leads Packed Earnings Calendar As Investors Eye Tech, Pharma Results",
+    "id": 143364757,
+    "image": "",
+    "related": "AAPL",
+    "source": "SeekingAlpha",
+    "summary": "Preview next weekâs market movers: jobs data, PMI reports, major earnings from Apple and AMD, and IPO buzz. Read here for more details.",
+    "url": "https://finnhub.io/api/news?id=830af5c87daf35a8f602c2ec6680ca3553df23bdc7beabc0bcac73d5ef2dce14"
+  },
+  {
+    "category": "company",
+    "datetime": 1793419800,
+    "headline": "QQQ Quarterly Outlook Report",
+    "id": 143361398,
+    "image": "",
+    "related": "AAPL",
+    "source": "SeekingAlpha",
+    "summary": "InvescoÂ QQQ's NAV rose during the third quarter, with a total return of 0.53%, underperforming the S&P 500 which returned 2.30%. Read more here.",
+    "url": "https://finnhub.io/api/news?id=1791b1f4b7dca802beb5ab78ac71c9b0eba61b75c833294a34c26476dd334cfb"
+  }
+]

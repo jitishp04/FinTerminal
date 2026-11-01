@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import { clearCache } from "../cache";
-import { covers, quote } from "./finnhub";
+import { companyNews, covers, quote, topicNews } from "./finnhub";
 import { resetHealth } from "./health";
 
 const KEY = "d0123456789abcdef0123456789abcdefg";
@@ -108,5 +108,30 @@ describe("quote", () => {
     expect(await rejection(quote("AAPL"))).toMatchObject({ status: 502 });
     stubFinnhub();
     expect((await quote("AAPL"))?.price).toBe(344.63);
+  });
+});
+
+describe("news", () => {
+  const story = { category: "company", datetime: 1793518367, headline: "Apple CEO says", id: 1, image: "", related: "AAPL", source: "Yahoo", summary: "", url: "https://finnhub.io/api/news?id=1" };
+
+  it("asks for a company's last week of news, as Finnhub names the symbol", async () => {
+    const fetchStub = stubFinnhub([story]);
+
+    const items = await companyNews("BRK-B", new Date("2026-11-01T12:00:00Z"));
+
+    expect(fetchStub.mock.calls[0][0]).toBe("https://finnhub.io/api/v1/company-news?symbol=BRK.B&from=2026-10-25&to=2026-11-01");
+    expect(fetchStub.mock.calls[0][1]?.headers).toMatchObject({ "X-Finnhub-Token": KEY });
+    expect(items).toEqual([{ title: "Apple CEO says", url: story.url, time: 1793518367, source: "Yahoo Finance" }]);
+  });
+
+  it("asks for a category's news", async () => {
+    const fetchStub = stubFinnhub([story]);
+    await topicNews("crypto");
+    expect(fetchStub.mock.calls[0][0]).toBe("https://finnhub.io/api/v1/news?category=crypto");
+  });
+
+  it("explains a refused key", async () => {
+    stubFinnhub({ error: "Invalid API key" }, 401);
+    expect(await rejection(topicNews("merger"))).toMatchObject({ status: 401 });
   });
 });

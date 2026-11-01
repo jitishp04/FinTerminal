@@ -92,11 +92,13 @@ function Plot({ width: w, height: h, sectors, active, onActive, onOpen }: Rotati
     };
     return { name, box };
   });
-  const trendTitle = "Trend →";
-  const momentumTitle = "Momentum ↑";
+  const title = (text: string, x: number, y: number) => ({
+    text,
+    box: { x, y, width: textWidth(text, SMALL_FONT), height: SMALL_FONT },
+  });
   const titles = [
-    { text: trendTitle, box: { x: plot.x + plot.width - PAD - textWidth(trendTitle, SMALL_FONT), y: centre.y - PAD - SMALL_FONT, width: textWidth(trendTitle, SMALL_FONT), height: SMALL_FONT } },
-    { text: momentumTitle, box: { x: centre.x + PAD, y: plot.y + PAD, width: textWidth(momentumTitle, SMALL_FONT), height: SMALL_FONT } },
+    title("Trend →", plot.x + plot.width - PAD - textWidth("Trend →", SMALL_FONT), centre.y - PAD - SMALL_FONT),
+    title("Momentum ↑", centre.x + PAD, plot.y + PAD),
   ];
 
   const heads = sectors.map((s) => {
@@ -112,7 +114,8 @@ function Plot({ width: w, height: h, sectors, active, onActive, onOpen }: Rotati
 
   const dim = (symbol: string) => active !== undefined && active !== symbol;
   // The pointed-at sector is drawn last, on top of the others.
-  const order = sectors.map((_, i) => i).sort((a, b) => Number(sectors[a].symbol === active) - Number(sectors[b].symbol === active));
+  const isActive = (i: number) => Number(sectors[i].symbol === active);
+  const order = sectors.map((_, i) => i).sort((a, b) => isActive(a) - isActive(b));
 
   return (
     <svg

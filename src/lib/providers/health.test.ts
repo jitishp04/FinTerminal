@@ -145,4 +145,11 @@ describe("health", () => {
     expect(source("yahoo").state).toBe("idle");
     expect(source("coinbase").state).toBe("idle");
   });
+
+  it("keeps outcomes when the dev server reloads this module, as a stream hub goes on using the old copy", async () => {
+    await tracked("coinbase", async () => "open");
+    vi.resetModules();
+    const reloaded = await import("./health");
+    expect(reloaded.health().find(({ id }) => id === "coinbase")).toMatchObject({ state: "ok" });
+  });
 });

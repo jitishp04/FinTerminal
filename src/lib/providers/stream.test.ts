@@ -270,6 +270,26 @@ describe("failures", () => {
     expect(health().find(({ id }) => id === "finnhub")).toMatchObject({ state: "ok" });
   });
 
+  it("counts each sign of life as the source answering, so the status bar's time follows the feed", async () => {
+    const hub = setup();
+    hub.watch(["AAPL"], watcher());
+    latest().open();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.advanceTimersByTime(60_000);
+    latest().message({ type: "ping" });
+    expect(health().find(({ id }) => id === "finnhub")).toMatchObject({ state: "ok", lastOk: NOW + 60_000 });
+  });
+
+  it("doesn't count an error the feed reports as a sign of life", async () => {
+    const hub = setup();
+    hub.watch(["AAPL"], watcher());
+    latest().open();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.advanceTimersByTime(60_000);
+    latest().message({ type: "error", msg: "Subscribing to too many symbols" });
+    expect(health().find(({ id }) => id === "finnhub")).toMatchObject({ lastOk: NOW });
+  });
+
   it("says nothing streams when the socket drops, then reconnects and subscribes again", () => {
     const hub = setup();
     const panel = watcher();

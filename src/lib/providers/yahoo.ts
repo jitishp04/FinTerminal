@@ -7,7 +7,21 @@ import { ApiError } from "../api";
 import { cached } from "../cache";
 import { wallClock } from "../chartData";
 import { parseRss } from "../news";
-import type { Bar, Chart, ChartRange, History, MoverType, NewsItem, OptionChain, OptionContract, Profile, Quote } from "../types";
+import type { ScreenId } from "../screens";
+import type {
+  Bar,
+  Chart,
+  ChartRange,
+  History,
+  MoverType,
+  NewsItem,
+  OptionChain,
+  OptionContract,
+  Profile,
+  Quote,
+  Screen,
+  ScreenRow,
+} from "../types";
 import { tracked } from "./health";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
@@ -29,6 +43,10 @@ const NEWS_FEED = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const HISTORY_TTL = 4 * 60 * MINUTE;
 // Under the options panel's 60 s poll, for the same reason as quotes.
 const OPTIONS_TTL = 50 * SECOND;
+// Under the screener's 5-minute refresh.
+const SCREEN_TTL = 4 * MINUTE;
+// The most rows Yahoo answers a screen with.
+const SCREEN_COUNT = 250;
 
 const MOVERS_COUNT = 25;
 
@@ -95,15 +113,44 @@ export function movers(type: MoverType): Promise<Quote[]> {
       const { quotes } = (await yahoo.screener(options, undefined, { validateResult: false })) as {
         quotes: { regularMarketTime?: number }[];
       };
-      return quotes
-        .flatMap((row) => {
-          // The same fields as quote(), except that the time comes in epoch seconds.
-          const time = row.regularMarketTime;
-          return toQuote({ ...row, regularMarketTime: time && new Date(time * 1000) } as unknown as YahooQuote) ?? [];
-        })
-        .sort((a, b) => rank(a) - rank(b));
+      return quotes.flatMap((row) => screenerQuote(row) ?? []).sort((a, b) => rank(a) - rank(b));
     }),
   );
+}
+
+/** A screener row as a quote: the same fields as quote()'s, except that the time comes in epoch seconds. */
+function screenerQuote(row: { regularMarketTime?: number }): Quote | undefined {
+  const time = row.regularMarketTime;
+  return toQuote({ ...row, regularMarketTime: time && new Date(time * 1000) } as unknown as YahooQuote);
+}
+
+/** The first 250 stocks one of Yahoo's predefined screens finds, in its order. */
+export function screen(id: ScreenId): Promise<Screen> {
+  return cached(`screen:${id}`, SCREEN_TTL, () =>
+    tracked("yahoo", async () => {
+      // Not validated, for the same reason as quote().
+      const answer = (await yahoo.screener({ scrIds: id, count: SCREEN_COUNT }, undefined, { validateResult: false })) as {
+        description?: string;
+        total?: number;
+        quotes: ScreenerRow[];
+      };
+      const rows = answer.quotes.flatMap((row): ScreenRow[] => {
+        const quote = screenerQuote(row);
+        if (!quote) return [];
+        return [{ ...quote, marketCap: row.marketCap, peRatio: row.trailingPE, week52Low: row.fiftyTwoWeekLow, week52High: row.fiftyTwoWeekHigh }];
+      });
+      return { id, description: answer.description ?? "", total: answer.total ?? rows.length, rows };
+    }),
+  );
+}
+
+/** The fields of a screener row the screen table needs besides a quote's. */
+interface ScreenerRow {
+  regularMarketTime?: number;
+  marketCap?: number;
+  trailingPE?: number;
+  fiftyTwoWeekLow?: number;
+  fiftyTwoWeekHigh?: number;
 }
 
 /** Price bars for `range`, with the bar size the range calls for, plus history before it. */

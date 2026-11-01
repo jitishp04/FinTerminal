@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, history, movers, news, options, profile, quote, sessionStart } from "./yahoo";
+import { chart, history, movers, news, options, profile, quote, screen, sessionStart } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn(), options: vi.fn() }));
 
@@ -484,5 +484,60 @@ describe("options", () => {
   it("answers an unknown symbol, which Yahoo answers with nothing, with a 404", async () => {
     yahoo.options.mockResolvedValue(undefined);
     await expect(options("ZZZZZZ")).rejects.toMatchObject({ status: 404, message: "No data for ZZZZZZ" });
+  });
+});
+
+describe("screen", () => {
+  // Trimmed from a live undervalued-growth row on 1 Nov 2026.
+  const NU = {
+    ...AAPL,
+    symbol: "NU",
+    longName: "Nu Holdings Ltd.",
+    regularMarketPrice: 11.61,
+    regularMarketChangePercent: -3.65146,
+    regularMarketVolume: 92_844_229,
+    regularMarketTime: 1793390403,
+    marketCap: 56_084_295_680,
+    trailingPE: 15.904109,
+    fiftyTwoWeekLow: 11.2,
+    fiftyTwoWeekHigh: 18.98,
+  };
+
+  beforeEach(() => {
+    clearCache();
+    yahoo.screener.mockReset();
+  });
+
+  it("asks for Yahoo's most rows, unvalidated, and keeps its description and total", async () => {
+    yahoo.screener.mockResolvedValue({ description: "Stocks with earnings growth rates better than 25%", total: 243, quotes: [NU] });
+    const result = await screen("undervalued_growth_stocks");
+    expect(yahoo.screener).toHaveBeenCalledWith({ scrIds: "undervalued_growth_stocks", count: 250 }, undefined, { validateResult: false });
+    expect(result).toMatchObject({ id: "undervalued_growth_stocks", description: "Stocks with earnings growth rates better than 25%", total: 243 });
+  });
+
+  it("makes each row a quote, with market cap, P/E and the 52-week range", async () => {
+    yahoo.screener.mockResolvedValue({ description: "", total: 1, quotes: [NU] });
+    const [row] = (await screen("undervalued_growth_stocks")).rows;
+    expect(row).toMatchObject({
+      symbol: "NU",
+      name: "Nu Holdings Ltd.",
+      price: 11.61,
+      changePercent: -3.65146,
+      volume: 92_844_229,
+      time: 1793390403,
+      marketCap: 56_084_295_680,
+      peRatio: 15.904109,
+      week52Low: 11.2,
+      week52High: 18.98,
+    });
+  });
+
+  it("keeps Yahoo's order, leaves out a row without a price, and leaves a missing P/E missing", async () => {
+    const loser = { ...NU, symbol: "LOSS", trailingPE: undefined };
+    yahoo.screener.mockResolvedValue({ total: 3, quotes: [loser, { symbol: "BAD", quoteType: "EQUITY" }, NU] });
+    const { rows, description } = await screen("aggressive_small_caps");
+    expect(rows.map(({ symbol }) => symbol)).toEqual(["LOSS", "NU"]);
+    expect(rows[0].peRatio).toBeUndefined();
+    expect(description).toBe("");
   });
 });

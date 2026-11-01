@@ -258,6 +258,24 @@ export interface OptionChain {
   puts: OptionContract[];
 }
 
+/** A stock a screen found: its quote, and what the screen table shows besides. */
+export interface ScreenRow extends Quote {
+  marketCap?: number;
+  /** Trailing. Missing for a company without earnings. */
+  peRatio?: number;
+  week52Low?: number;
+  week52High?: number;
+}
+
+export interface Screen {
+  id: string;
+  /** Yahoo's account of what it looks for, e.g. "Stocks with earnings growth rates better than 25%…". */
+  description: string;
+  /** How many stocks match, of which `rows` are the first, in Yahoo's order. */
+  total: number;
+  rows: ScreenRow[];
+}
+
 /** What a DCF starts from, each with where it came from. Money is in US dollars, as the SEC has it. */
 export interface DcfInputs {
   symbol: string;

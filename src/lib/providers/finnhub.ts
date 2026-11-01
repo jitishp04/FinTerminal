@@ -12,9 +12,6 @@ const QUOTE_TTL = 60 * 1000;
 const NEWS_TTL = 4 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Indices, FX, futures, crypto and foreign tickers all carry a mark of some kind: ^GSPC, EURUSD=X, GC=F, BTC-USD, VOD.L.
-const US_TICKER = /^[A-Z]{1,5}(-[A-Z])?$/;
-
 interface FinnhubQuote {
   /** Last price. 0 for a symbol Finnhub doesn't know. */
   c: number;
@@ -28,8 +25,8 @@ interface FinnhubQuote {
   t: number;
 }
 
-/** Whether Finnhub can stand in for this symbol: its free plan has US stocks and funds only. */
-export const covers = (symbol: string) => US_TICKER.test(symbol);
+// Whether Finnhub can stand in for a symbol. The browser needs it too, for the live stream.
+export { covers } from "../live";
 
 function toQuote(symbol: string, { c, d, dp, h, l, o, pc, t }: FinnhubQuote): Quote | null {
   if (!c) return null;

@@ -20,7 +20,7 @@ Work moves between the user's Windows PC and cloud sessions (claude.ai/code, the
 - **Picking up cloud work locally**: `git fetch` and check out the branch the cloud session pushed (`claude --teleport` also brings the conversation).
 - **Dependencies**: a SessionStart hook (`.claude/hooks/install-deps.mjs`) runs `npm ci` whenever `package.json` or `package-lock.json` changed since the last install, in both places. Keep the lockfile in sync: change dependencies only with `npm install`, and commit `package-lock.json` alongside `package.json`.
 - **Detecting the cloud**: `CLAUDE_CODE_REMOTE=true`. There, no one can open the browser preview, so verify with `npm test`, `npm run typecheck`, `npm run build`, and `curl` against `npm run dev`, and say in the PR that the browser check is still to do.
-- **Cloud environment** (the user sets it once at claude.ai/code): network access **Custom** with the default list plus `*.yahoo.com`, `*.sec.gov`, `api.stlouisfed.org`, `finnhub.io`. Keys go in as environment variables with the same names as `.env.local`, which Next.js reads either way.
+- **Cloud environment** (the user sets it once at claude.ai/code): network access **Custom** with the default list plus `*.yahoo.com`, `*.sec.gov`, `api.stlouisfed.org`, `finnhub.io`, `ws.finnhub.io`. Keys go in as environment variables with the same names as `.env.local`, which Next.js reads either way.
 
 ## Stack
 Next.js 16 (App Router, `cacheComponents` on) + TypeScript + Tailwind v4 · TanStack Query · TradingView `lightweight-charts` · Vitest.
@@ -41,6 +41,7 @@ src/components/functions/*.tsx   one component per function code
 |---|---|---|
 | Quotes, charts, profile, movers (stocks, ETFs, indices, FX, futures) | `yahoo-finance2` | none |
 | Quote fallback (US stocks) | Finnhub | `FINNHUB_API_KEY` |
+| Live trades (US stocks and funds) | Finnhub websocket, one per server, fanned out over SSE (`/api/stream`) | `FINNHUB_API_KEY` |
 | Financial statements, filings, insider Form 4s | SEC EDGAR (≤10 req/s) | `SEC_USER_AGENT` (required contact header) |
 | Macro series, Treasury yield curve | FRED | `FRED_API_KEY` |
 

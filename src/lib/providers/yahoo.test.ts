@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, movers, profile, quote, sessionStart } from "./yahoo";
+import { chart, history, movers, profile, quote, sessionStart } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn() }));
 
@@ -247,6 +247,75 @@ describe("chart", () => {
       status: 502,
       message: "Yahoo Finance isn't responding. Retrying…",
     });
+  });
+});
+
+describe("history", () => {
+  // Trimmed from a live response on 1 Nov 2026, around NVDA's 10-for-1 split on 10 June 2024.
+  const NVDA = {
+    meta: { symbol: "NVDA", currency: "USD", instrumentType: "EQUITY", exchangeTimezoneName: "America/New_York" },
+    quotes: [
+      bar("2024-06-07T13:30:00Z", 120.888, { adjclose: 120.5443 }),
+      bar("2024-06-10T13:30:00Z", 121.79, { adjclose: 121.4437 }),
+      bar("2024-06-11T13:30:00Z", 120.91, { adjclose: 120.5761 }),
+    ],
+    events: {
+      dividends: [
+        { amount: 0.004, date: new Date("2024-03-05T14:30:00Z") },
+        { amount: 0.01, date: new Date("2024-06-11T13:30:00Z") },
+      ],
+    },
+  };
+
+  it("asks for every day since 1970, with dividends", async () => {
+    yahoo.chart.mockResolvedValue(NVDA);
+
+    await history("NVDA");
+
+    const [[symbol, options]] = yahoo.chart.mock.calls;
+    expect(symbol).toBe("NVDA");
+    expect(options).toMatchObject({ period1: new Date(0), interval: "1d", includePrePost: false, events: "div" });
+  });
+
+  it("keeps Yahoo's split-adjusted closes and dividends, so a split shows no jump", async () => {
+    yahoo.chart.mockResolvedValue(NVDA);
+
+    expect(await history("NVDA")).toEqual({
+      symbol: "NVDA",
+      type: "EQUITY",
+      currency: "USD",
+      days: [
+        { date: "2024-06-07", close: 120.888, adjClose: 120.5443 },
+        { date: "2024-06-10", close: 121.79, adjClose: 121.4437 },
+        { date: "2024-06-11", close: 120.91, adjClose: 120.5761 },
+      ],
+      // $0.04 before the split, as Yahoo gives it: a tenth, like the closes.
+      dividends: [
+        { date: "2024-03-05", amount: 0.004 },
+        { date: "2024-06-11", amount: 0.01 },
+      ],
+    });
+  });
+
+  it("dates days in the exchange's time zone, and leaves out today's, which may not be final", async () => {
+    // Midday on 30 October in Sydney, where each day's bar is stamped 23:00 UTC the day before.
+    vi.useFakeTimers({ now: new Date("2026-10-30T01:00:00Z") });
+    yahoo.chart.mockResolvedValue({
+      meta: { ...NVDA.meta, symbol: "BHP.AX", currency: "AUD", exchangeTimezoneName: "Australia/Sydney" },
+      quotes: [bar("2026-10-28T23:00:00Z", 45.1), bar("2026-10-29T23:00:00Z", 45.6)],
+      events: { dividends: [{ amount: 0.6, date: new Date("2026-10-29T23:00:00Z") }] },
+    });
+
+    const result = await history("BHP.AX");
+    vi.useRealTimers();
+
+    expect(result.days).toEqual([{ date: "2026-10-29", close: 45.1, adjClose: 45.1 }]);
+    expect(result.dividends).toEqual([]);
+  });
+
+  it("answers an unknown symbol with a 404", async () => {
+    yahoo.chart.mockRejectedValue(new Error("No data found, symbol may be delisted"));
+    await expect(history("ZZZZ")).rejects.toMatchObject({ status: 404 });
   });
 });
 

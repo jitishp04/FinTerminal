@@ -164,6 +164,33 @@ export interface Chart {
   bars: Bar[];
 }
 
+export interface DailyClose {
+  /** The trading day, in the exchange's time zone, e.g. "2024-06-07". */
+  date: string;
+  /** Adjusted for splits, as all of Yahoo's prices are. */
+  close: number;
+  /** Also adjusted for dividends paid since. The same as `close` where there have been none. */
+  adjClose: number;
+}
+
+export interface Dividend {
+  /** The ex-dividend date: shares held at the close the day before get it. */
+  date: string;
+  /** Per share, adjusted for splits like the closes. */
+  amount: number;
+}
+
+export interface History {
+  symbol: string;
+  /** "EQUITY", "ETF", "MUTUALFUND", "INDEX", "CURRENCY", "FUTURE", … */
+  type: string;
+  currency?: string;
+  /** Oldest first, to the last full day: today's may still be trading, so it's left out. */
+  days: DailyClose[];
+  /** Oldest first, on the same days. */
+  dividends: Dividend[];
+}
+
 export interface WeeklyClose {
   /** The Monday the week starts on, in the exchange's time zone, e.g. "2026-10-26". */
   week: string;

@@ -1,10 +1,11 @@
 import YahooFinance from "yahoo-finance2";
-import type { ChartResultArrayQuote } from "yahoo-finance2/modules/chart";
+import type { ChartEventDividend, ChartMeta, ChartResultArrayQuote } from "yahoo-finance2/modules/chart";
 import type { Quote as YahooQuote } from "yahoo-finance2/modules/quote";
 import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-iface";
 import { ApiError } from "../api";
 import { cached } from "../cache";
-import type { Bar, Chart, ChartRange, MoverType, Profile, Quote } from "../types";
+import { wallClock } from "../chartData";
+import type { Bar, Chart, ChartRange, History, MoverType, Profile, Quote } from "../types";
 import { tracked } from "./health";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
@@ -19,6 +20,8 @@ const QUOTE_TTL = 8 * SECOND;
 // Under the 60 s poll, for the same reason.
 const MOVERS_TTL = 50 * SECOND;
 const PROFILE_TTL = 60 * MINUTE;
+// Daily closes change once a day, and a full history is a big download.
+const HISTORY_TTL = 4 * 60 * MINUTE;
 
 const MOVERS_COUNT = 25;
 
@@ -109,6 +112,21 @@ export function chart(symbol: string, range: ChartRange): Promise<Chart> {
       const bars = toBars(quotes);
       const from = "sessions" in spec ? sessionStart(bars, timeZone, spec.sessions) : seconds(spec.start(now));
       return { symbol: meta.symbol, range, interval, currency: meta.currency, timeZone, from: from ?? seconds(now), bars };
+    }),
+  );
+}
+
+/** Every daily close since the symbol began, to the last full day, with its dividends. */
+export function history(symbol: string): Promise<History> {
+  return cached(`history:${symbol}`, HISTORY_TTL, () =>
+    orNotFound(symbol, async () => {
+      const { meta, quotes, events } = await yahoo.chart(symbol, {
+        period1: new Date(0),
+        interval: "1d",
+        includePrePost: false,
+        events: "div",
+      });
+      return toHistory(meta, quotes, events?.dividends ?? [], new Date());
     }),
   );
 }
@@ -226,5 +244,24 @@ export function toProfile(symbol: string, r: QuoteSummaryResult): Profile {
     grossMargin: financials?.grossMargins,
     operatingMargin: financials?.operatingMargins,
     profitMargin: financials?.profitMargins ?? stats?.profitMargins,
+  };
+}
+
+/** Daily bars as dated closes, in the exchange's time zone. Today's is left out: it may still be trading. */
+export function toHistory(meta: ChartMeta, rows: ChartResultArrayQuote[], dividends: ChartEventDividend[], now: Date): History {
+  const day = (time: number) => new Date(wallClock(time, meta.exchangeTimezoneName) * 1000).toISOString().slice(0, 10);
+  const today = day(seconds(now));
+  return {
+    symbol: meta.symbol,
+    type: meta.instrumentType,
+    currency: meta.currency,
+    days: toBars(rows).flatMap(({ time, close, adjClose }) => {
+      const date = day(time);
+      return date < today ? [{ date, close, adjClose: adjClose ?? close }] : [];
+    }),
+    dividends: dividends.flatMap(({ date, amount }) => {
+      const exDate = day(seconds(date));
+      return exDate < today ? [{ date: exDate, amount }] : [];
+    }),
   };
 }

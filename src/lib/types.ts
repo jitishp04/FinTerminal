@@ -232,12 +232,16 @@ export type WeekClose = Pick<Bar, "time" | "close">;
 export interface Weekly {
   symbol: string;
   currency?: string;
+  /** The exchange's IANA time zone. */
+  timeZone: string;
   weeks: Bar[];
 }
 
 /** What THS draws: a symbol's weeks, and those of the market it's measured against. */
 export interface Thesis extends Weekly {
   benchmark: { symbol: string; name: string; weeks: WeekClose[] };
+  /** When the company last reported, oldest first, in epoch seconds. Empty for funds, FX and the like. */
+  earnings: number[];
 }
 
 /** One option contract, as Yahoo quotes it, 15 minutes delayed. */

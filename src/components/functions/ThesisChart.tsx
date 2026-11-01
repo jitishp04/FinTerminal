@@ -73,7 +73,7 @@ export function ThesisChart({
       layout: { ...look.layout, panes: { separatorColor: border } },
       autoSize: true,
       // Room for the labels, which would otherwise stretch the scale below zero.
-      rightPriceScale: { borderColor: border, scaleMargins: { top: 0.12, bottom: 0.16 } },
+      rightPriceScale: { borderColor: border, scaleMargins: { top: 0.12, bottom: 0.26 } },
       timeScale: { borderColor: border, lockVisibleTimeRangeOnResize: true },
     });
     const line = { lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false } as const;
@@ -138,7 +138,9 @@ export function ThesisChart({
     if (!h) return;
     const { up, down, muted, link, yellow } = h.colors;
     const decimals = priceDecimals(weeks.at(-1)?.bar.close ?? 100);
-    const priceFormat = { type: "price", precision: decimals, minMove: 10 ** -decimals } as const;
+    // The labels' room below the candles can reach under zero, where the axis has nothing to say.
+    const formatter = (price: number) => (price < 0 ? "" : price.toFixed(decimals));
+    const priceFormat = { type: "custom", minMove: 10 ** -decimals, formatter } as const;
     for (const series of [h.candles, h.trend, h.upper, h.lower]) series.applyOptions({ priceFormat });
 
     h.candles.setData(weeks.map(({ bar: { time, open, high, low, close } }) => ({ time: at(time), open, high, low, close })));

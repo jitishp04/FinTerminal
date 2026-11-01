@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, history, movers, news, options, profile, quote, screen, sessionStart, weekly } from "./yahoo";
+import { chart, earningsDates, history, movers, news, options, profile, quote, screen, sessionStart, weekly } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn(), options: vi.fn() }));
 
@@ -349,6 +349,7 @@ describe("weekly", () => {
     expect(await weekly("VOLV-B.ST")).toEqual({
       symbol: "VOLV-B.ST",
       currency: "SEK",
+      timeZone: "Europe/Stockholm",
       weeks: [
         { time: Date.UTC(2026, 9, 26) / 1000, open: 300, high: 320, low: 295, close: 310, volume: 30 },
         { time: Date.UTC(2026, 10, 2) / 1000, open: 305, high: 305, low: 305, close: 305, volume: 30 },
@@ -360,6 +361,40 @@ describe("weekly", () => {
     yahoo.chart.mockRejectedValue(new Error("No data found, symbol may be delisted"));
 
     await expect(weekly("ZZZZ")).rejects.toMatchObject({ status: 404, message: "No data for ZZZZ" });
+  });
+});
+
+describe("earningsDates", () => {
+  // Trimmed from a live response on 2 Nov 2026.
+  const reports = (...dates: string[]) => ({
+    earnings: { earningsChart: { quarterly: dates.map((date) => ({ date: "2Q2026", reportedDate: new Date(date) })) } },
+  });
+  const seconds = (date: string) => Date.parse(date) / 1000;
+
+  it("gives the report dates, oldest first", async () => {
+    yahoo.quoteSummary.mockResolvedValue(reports("2026-07-30T20:30:28Z", "2026-01-29T21:30:00Z"));
+
+    expect(await earningsDates("AAPL")).toEqual([seconds("2026-01-29T21:30:00Z"), seconds("2026-07-30T20:30:28Z")]);
+    expect(yahoo.quoteSummary).toHaveBeenCalledWith("AAPL", { modules: ["price", "earnings"] });
+  });
+
+  it("is empty for a symbol with no earnings, such as a fund", async () => {
+    yahoo.quoteSummary.mockResolvedValue({ price: {} });
+
+    expect(await earningsDates("SPY")).toEqual([]);
+  });
+
+  it("uses Nokia's US listing for its Stockholm one, which Yahoo has no dates for", async () => {
+    yahoo.quoteSummary.mockResolvedValue(reports("2026-10-22T05:30:00Z"));
+
+    expect(await earningsDates("NOKIA-SEK.ST")).toEqual([seconds("2026-10-22T05:30:00Z")]);
+    expect(yahoo.quoteSummary).toHaveBeenCalledWith("NOK", { modules: ["price", "earnings"] });
+  });
+
+  it("answers 404 for a symbol Yahoo doesn't know", async () => {
+    yahoo.quoteSummary.mockRejectedValue(new Error("Quote not found for symbol: ZZZZ"));
+
+    await expect(earningsDates("ZZZZ")).rejects.toMatchObject({ status: 404 });
   });
 });
 

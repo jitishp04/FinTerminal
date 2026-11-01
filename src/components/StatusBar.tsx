@@ -6,6 +6,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { formatUpdated } from "@/lib/format";
 import { isUsMarketOpen } from "@/lib/market";
 import type { SourceHealth } from "@/lib/sources";
+import { useLiveSnapshot } from "./functions/useLive";
 
 const HEALTH_REFRESH = 10_000;
 
@@ -70,6 +71,20 @@ function Sources({ now }: { now: Date | null }) {
   );
 }
 
+/** How many symbols stream from Finnhub, while any do. */
+function Live() {
+  const { size } = useLiveSnapshot().live;
+  if (size === 0) return null;
+  return (
+    <span
+      title={`${size} US ${size === 1 ? "symbol streams" : "symbols stream"} from Finnhub: in the regular session, their prices move with each trade.`}
+      className="hidden text-up sm:inline"
+    >
+      LIVE {size}
+    </span>
+  );
+}
+
 export function StatusBar() {
   const seconds = useSyncExternalStore(subscribeClock, getSeconds, getServerSeconds);
   const now = seconds === null ? null : new Date(seconds * 1000);
@@ -85,6 +100,7 @@ export function StatusBar() {
         ))}
       </ul>
       <Sources now={now} />
+      <Live />
       <span title="Yahoo and Finnhub prices can lag the market, by 15 minutes or more on some exchanges." className="hidden lg:inline">
         PRICES MAY BE DELAYED
       </span>

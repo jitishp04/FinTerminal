@@ -4,7 +4,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { formatChange, formatPercent, formatPrice, priceDecimals } from "@/lib/format";
+import { withTrade } from "@/lib/live";
 import type { Quote } from "@/lib/types";
+import { LIVE_REFRESH, useLive } from "./useLive";
 
 // What W, WEI and the other quote tables share.
 
@@ -13,20 +15,25 @@ const REFRESH = 10_000;
 export const QUOTE_TABLE =
   "w-full text-right whitespace-nowrap [&_td]:px-1 [&_td]:py-0.5 [&_th]:px-1 [&_th]:py-0.5 [&_th]:font-normal";
 
-/** Quotes for a list, refreshed by one batched request. Panels showing the same list share it. */
+/**
+ * Quotes for a list, refreshed by one batched request that panels showing the same list share.
+ * US stocks and funds also move with each trade, and while all of a list's symbols stream, the request comes less often.
+ */
 export function useQuotes(symbols: string[]) {
+  const { trades, live } = useLive(symbols);
+  const refresh = symbols.length > 0 && symbols.every((symbol) => live.has(symbol)) ? LIVE_REFRESH : REFRESH;
   const { data, error, isPlaceholderData, dataUpdatedAt } = useQuery({
     queryKey: ["quotes", symbols],
     queryFn: async () =>
       (await fetchApi<{ quotes: Quote[] }>(`/api/quote?symbols=${symbols.map(encodeURIComponent).join(",")}`)).quotes,
     enabled: symbols.length > 0,
-    refetchInterval: REFRESH,
+    refetchInterval: refresh,
     // Fresh until the next poll, so switching windows doesn't refetch it.
-    staleTime: REFRESH,
+    staleTime: refresh,
     // Keeps the rows on screen while a changed list loads.
     placeholderData: keepPreviousData,
   });
-  const quotes = useMemo(() => new Map(data?.map((q) => [q.symbol, q])), [data]);
+  const quotes = useMemo(() => new Map(data?.map((q) => [q.symbol, withTrade(q, trades.get(q.symbol))])), [data, trades]);
   return {
     quotes,
     error,

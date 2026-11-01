@@ -209,6 +209,7 @@ export type Hub = ReturnType<typeof createHub>;
 
 const connect = (): Socket => new WebSocket(`wss://ws.finnhub.io?token=${encodeURIComponent(process.env.FINNHUB_API_KEY ?? "")}`);
 
-// Next's dev server reloads a module when it changes. One hub for the process keeps that to one socket.
+// Next's dev server reloads a module when it changes. One hub for the process keeps that to one socket,
+// so a change to this file needs a restart of the dev server.
 const shared = globalThis as typeof globalThis & { finnhubHub?: Hub };
 export const hub = (shared.finnhubHub ??= createHub(connect));

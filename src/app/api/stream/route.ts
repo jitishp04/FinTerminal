@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { ApiError, readSymbols, respond } from "@/lib/api";
+import { readSymbols, respond } from "@/lib/api";
 import { hub } from "@/lib/providers/finnhubStream";
 
 /** A comment this often keeps the connection from looking idle. */
@@ -8,19 +8,22 @@ const KEEP_ALIVE = 20_000;
 /**
  * GET /api/stream?symbols=AAPL,MSFT → Server-Sent Events, for as long as the browser listens:
  * `live` lists the symbols streaming right now, and `trades` carries their latest trades, at most once a second.
- * Symbols Finnhub doesn't have never stream. Without a Finnhub key it answers 503, and the browser goes on polling.
+ * Symbols Finnhub doesn't have never stream. Without a Finnhub key it answers 204, which tells an EventSource
+ * not to reconnect, and the browser goes on polling.
  */
 export async function GET(request: NextRequest) {
+  // Read outside the try: reading the query is how the build learns the route is dynamic, and the catch would hide that.
+  const params = request.nextUrl.searchParams;
   let symbols: string[];
   try {
-    symbols = readSymbols(request.nextUrl.searchParams, "symbols");
-    if (!process.env.FINNHUB_API_KEY) throw new ApiError(503, "Live prices need FINNHUB_API_KEY in .env.local.");
+    symbols = readSymbols(params, "symbols");
   } catch (error) {
-    // The answer has to be an error before the stream starts: an EventSource doesn't retry one.
     return respond(async () => {
       throw error;
     });
   }
+  // Not an error: a setup without the key is a fine one.
+  if (!process.env.FINNHUB_API_KEY) return new Response(null, { status: 204 });
 
   const encoder = new TextEncoder();
   let stop = () => {};

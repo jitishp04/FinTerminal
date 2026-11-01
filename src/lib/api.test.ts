@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, readSymbol, respond } from "./api";
+import { ApiError, readSymbol, readSymbols, respond } from "./api";
+import { MAX_QUOTE_SYMBOLS } from "./types";
 
 const answer = async (response: Response) => ({ status: response.status, body: await response.json() });
 
@@ -34,6 +35,24 @@ describe("readSymbol", () => {
   });
 
   it.each(["", "symbol=", "symbol=AA PL"])("rejects %j with a 400", (query) => {
+    expect(() => read(query)).toThrow(expect.objectContaining({ status: 400 }));
+  });
+});
+
+describe("readSymbols", () => {
+  const read = (query: string) => readSymbols(new URLSearchParams(query), "symbols");
+
+  it("splits on commas, upper-cases and trims, skipping empty entries", () => {
+    expect(read("symbols=aapl,%20^gspc%20,,eurusd=x")).toEqual(["AAPL", "^GSPC", "EURUSD=X"]);
+  });
+
+  it(`takes ${MAX_QUOTE_SYMBOLS} symbols but not one more`, () => {
+    const many = Array.from({ length: MAX_QUOTE_SYMBOLS + 1 }, (_, i) => `S${i}`);
+    expect(read(`symbols=${many.slice(1).join(",")}`)).toHaveLength(MAX_QUOTE_SYMBOLS);
+    expect(() => read(`symbols=${many.join(",")}`)).toThrow(`At most ${MAX_QUOTE_SYMBOLS} symbols per request`);
+  });
+
+  it.each(["", "symbols=", "symbols=,", "symbols=AAPL,AA%20PL"])("rejects %j with a 400", (query) => {
     expect(() => read(query)).toThrow(expect.objectContaining({ status: 400 }));
   });
 });

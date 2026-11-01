@@ -24,6 +24,14 @@ export interface Quote {
   time?: number;
 }
 
+/** A US stock's or fund's latest trade, from Finnhub's stream. */
+export interface Trade {
+  symbol: string;
+  price: number;
+  /** Epoch seconds, to the millisecond. */
+  time: number;
+}
+
 export interface Bar {
   time: number;
   open: number;

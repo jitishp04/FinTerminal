@@ -69,6 +69,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "SPY DCA",
   },
   {
+    code: "DCF",
+    title: "DCF valuation",
+    description: "A range of values per share from discounted free cash flow",
+    keywords: ["dcf", "valuation", "intrinsic value", "discounted cash flow", "fair value", "monte carlo"],
+    group: "Security",
+    symbol: "required",
+    example: "MSFT DCF",
+  },
+  {
     code: "W",
     title: "Watchlist",
     description: "Your symbols with live prices",

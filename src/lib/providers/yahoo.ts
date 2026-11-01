@@ -1,12 +1,13 @@
 import YahooFinance from "yahoo-finance2";
 import type { ChartEventDividend, ChartMeta, ChartResultArrayQuote } from "yahoo-finance2/modules/chart";
+import type { CallOrPut, OptionsResult } from "yahoo-finance2/modules/options";
 import type { Quote as YahooQuote } from "yahoo-finance2/modules/quote";
 import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-iface";
 import { ApiError } from "../api";
 import { cached } from "../cache";
 import { wallClock } from "../chartData";
 import { parseRss } from "../news";
-import type { Bar, Chart, ChartRange, History, MoverType, NewsItem, Profile, Quote } from "../types";
+import type { Bar, Chart, ChartRange, History, MoverType, NewsItem, OptionChain, OptionContract, Profile, Quote } from "../types";
 import { tracked } from "./health";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
@@ -26,6 +27,8 @@ const NEWS_TTL = 4 * MINUTE;
 const NEWS_FEED = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 // Daily closes change once a day, and a full history is a big download.
 const HISTORY_TTL = 4 * 60 * MINUTE;
+// Under the options panel's 60 s poll, for the same reason as quotes.
+const OPTIONS_TTL = 50 * SECOND;
 
 const MOVERS_COUNT = 25;
 
@@ -159,6 +162,64 @@ export function profile(symbol: string): Promise<Profile> {
       ),
     ),
   );
+}
+
+/**
+ * One expiration's option chain: the nearest, or `expiry` ("2026-11-20"), which has to be one Yahoo lists.
+ * Yahoo answers an expiry it doesn't list with an empty chain, so this checks it first.
+ */
+export async function options(symbol: string, expiry?: string): Promise<OptionChain> {
+  const nearest = await optionChain(symbol);
+  if (!expiry || expiry === nearest.expiration) return nearest;
+  if (!nearest.expirations.includes(expiry)) throw new ApiError(400, `No ${symbol} options expire on ${expiry}`);
+  return optionChain(symbol, expiry);
+}
+
+function optionChain(symbol: string, expiry?: string): Promise<OptionChain> {
+  return cached(`options:${symbol}:${expiry ?? "nearest"}`, OPTIONS_TTL, () =>
+    tracked("yahoo", async () => {
+      // Not validated: Yahoo answers an unknown symbol with nothing, which the schema can only reject.
+      const raw = (await yahoo.options(symbol, expiry ? { date: new Date(`${expiry}T00:00:00Z`) } : {}, { validateResult: false })) as
+        | OptionsResult
+        | undefined;
+      return toOptionChain(symbol, raw);
+    }),
+  );
+}
+
+// Yahoo dates an expiration at midnight UTC on its day.
+const day = (date: Date) => date.toISOString().slice(0, 10);
+
+export function toOptionChain(symbol: string, raw: OptionsResult | undefined): OptionChain {
+  const price = raw?.quote?.regularMarketPrice;
+  if (!raw || typeof price !== "number") throw new ApiError(404, `No data for ${symbol}`);
+  const chain = raw.options[0];
+  if (raw.expirationDates.length === 0 || !chain) throw new ApiError(404, `${symbol} has no listed options`);
+  const byStrike = (a: OptionContract, b: OptionContract) => a.strike - b.strike;
+  return {
+    symbol,
+    currency: raw.quote.currency,
+    price,
+    expirations: raw.expirationDates.map(day),
+    expiration: day(chain.expirationDate),
+    calls: chain.calls.map(toContract).sort(byStrike),
+    puts: chain.puts.map(toContract).sort(byStrike),
+  };
+}
+
+function toContract(c: CallOrPut): OptionContract {
+  return {
+    contract: c.contractSymbol,
+    strike: c.strike,
+    bid: c.bid,
+    ask: c.ask,
+    last: c.lastPrice,
+    change: c.change,
+    volume: c.volume,
+    openInterest: c.openInterest,
+    impliedVolatility: c.impliedVolatility,
+    lastTrade: c.lastTradeDate ? seconds(c.lastTradeDate) : undefined,
+  };
 }
 
 /** Yahoo reports an unknown symbol as a plain Error; answer it with a 404. */

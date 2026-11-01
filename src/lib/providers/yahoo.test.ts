@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, history, movers, news, profile, quote, sessionStart } from "./yahoo";
+import { chart, history, movers, news, options, profile, quote, sessionStart } from "./yahoo";
 
-const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn() }));
+const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn(), options: vi.fn() }));
 
 vi.mock("yahoo-finance2", () => ({
   default: class {
@@ -11,6 +11,7 @@ vi.mock("yahoo-finance2", () => ({
     chart = yahoo.chart;
     quoteSummary = yahoo.quoteSummary;
     screener = yahoo.screener;
+    options = yahoo.options;
   },
 }));
 
@@ -408,5 +409,80 @@ describe("news", () => {
 
     await expect(news("AAPL")).rejects.toMatchObject({ status: 502, message: "Yahoo Finance isn't responding. Retrying…" });
     vi.unstubAllGlobals();
+  });
+});
+
+describe("options", () => {
+  // AAPL's nearest expiration, from a live answer on 1 Nov 2026, with its quote trimmed. Dates come as Dates.
+  const NEAREST = JSON.parse(readFileSync(new URL("../fixtures/options/aapl-nearest.json", import.meta.url), "utf8"), (_, value) =>
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) ? new Date(value) : value,
+  );
+  const onExpiry = (iso: string) => ({
+    ...NEAREST,
+    options: [{ ...NEAREST.options[0], expirationDate: new Date(`${iso}T00:00:00Z`) }],
+  });
+
+  beforeEach(() => {
+    clearCache();
+    yahoo.options.mockReset();
+  });
+
+  it("normalizes the nearest expiration's chain", async () => {
+    yahoo.options.mockResolvedValue(NEAREST);
+    const chain = await options("AAPL");
+    expect(yahoo.options).toHaveBeenCalledWith("AAPL", {}, { validateResult: false });
+    expect(chain).toMatchObject({ symbol: "AAPL", currency: "USD", price: 344.63, expiration: "2026-11-04" });
+    expect(chain.expirations).toHaveLength(19);
+    expect(chain.expirations.slice(0, 3)).toEqual(["2026-11-04", "2026-11-06", "2026-11-13"]);
+    expect(chain.calls).toHaveLength(44);
+    expect(chain.puts).toHaveLength(36);
+    expect(chain.calls[0]).toEqual({
+      contract: "AAPL261104C00275000",
+      strike: 275,
+      bid: 68.2,
+      ask: 71.55,
+      last: 69.61,
+      change: -4.540001,
+      volume: 10,
+      openInterest: 3,
+      impliedVolatility: 1.0478563232421876,
+      lastTrade: Date.UTC(2026, 9, 30, 18, 40, 7) / 1000,
+    });
+  });
+
+  it("puts each side in strike order, whatever order Yahoo sends", async () => {
+    const [first, ...rest] = NEAREST.options[0].calls;
+    yahoo.options.mockResolvedValue({ ...NEAREST, options: [{ ...NEAREST.options[0], calls: [...rest, first] }] });
+    const { calls } = await options("AAPL");
+    expect(calls.map(({ strike }) => strike)).toEqual([...calls.map(({ strike }) => strike)].sort((a, b) => a - b));
+  });
+
+  it("asks for a listed expiration by its day, at midnight UTC", async () => {
+    yahoo.options.mockImplementation(async (_symbol: string, query: { date?: Date }) => (query.date ? onExpiry("2026-11-20") : NEAREST));
+    const chain = await options("AAPL", "2026-11-20");
+    expect(yahoo.options).toHaveBeenLastCalledWith("AAPL", { date: new Date("2026-11-20T00:00:00Z") }, { validateResult: false });
+    expect(chain.expiration).toBe("2026-11-20");
+  });
+
+  it("answers the nearest expiration asked by name from the first request", async () => {
+    yahoo.options.mockResolvedValue(NEAREST);
+    expect((await options("AAPL", "2026-11-04")).expiration).toBe("2026-11-04");
+    expect(yahoo.options).toHaveBeenCalledOnce();
+  });
+
+  it("refuses an expiration Yahoo doesn't list, which it would answer with an empty chain", async () => {
+    yahoo.options.mockResolvedValue(NEAREST);
+    await expect(options("AAPL", "2026-11-05")).rejects.toMatchObject({ status: 400, message: "No AAPL options expire on 2026-11-05" });
+    expect(yahoo.options).toHaveBeenCalledOnce();
+  });
+
+  it("answers a symbol without options, such as a currency, with a 404", async () => {
+    yahoo.options.mockResolvedValue({ ...NEAREST, expirationDates: [], strikes: [], options: [], quote: { ...NEAREST.quote, quoteType: "CURRENCY" } });
+    await expect(options("EURUSD=X")).rejects.toMatchObject({ status: 404, message: "EURUSD=X has no listed options" });
+  });
+
+  it("answers an unknown symbol, which Yahoo answers with nothing, with a 404", async () => {
+    yahoo.options.mockResolvedValue(undefined);
+    await expect(options("ZZZZZZ")).rejects.toMatchObject({ status: 404, message: "No data for ZZZZZZ" });
   });
 });

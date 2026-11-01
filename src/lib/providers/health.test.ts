@@ -128,6 +128,7 @@ describe("health", () => {
       { id: "sec", name: "SEC EDGAR", state: "idle" },
       { id: "fred", name: "FRED", state: "idle" },
       { id: "finnhub", name: "Finnhub", state: "idle" },
+      { id: "coinbase", name: "Coinbase", state: "idle" },
     ]);
   });
 
@@ -140,7 +141,8 @@ describe("health", () => {
     expect(source(id).state).toBe("off");
   });
 
-  it("never shows Yahoo as off: it needs no key", () => {
+  it("never shows Yahoo or Coinbase as off: they need no key", () => {
     expect(source("yahoo").state).toBe("idle");
+    expect(source("coinbase").state).toBe("idle");
   });
 });

@@ -3,6 +3,7 @@ export const SOURCES = {
   sec: "SEC EDGAR",
   fred: "FRED",
   finnhub: "Finnhub",
+  coinbase: "Coinbase",
 } as const;
 
 export type SourceId = keyof typeof SOURCES;

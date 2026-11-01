@@ -71,13 +71,13 @@ function Sources({ now }: { now: Date | null }) {
   );
 }
 
-/** How many symbols stream from Finnhub, while any do. */
+/** How many symbols stream, while any do. */
 function Live() {
   const { size } = useLiveSnapshot().live;
   if (size === 0) return null;
   return (
     <span
-      title={`${size} US ${size === 1 ? "symbol streams" : "symbols stream"} from Finnhub: in the regular session, their prices move with each trade.`}
+      title={`${size} ${size === 1 ? "symbol streams" : "symbols stream"} live: US stocks from Finnhub in the regular session, crypto from Coinbase around the clock.`}
       className="hidden text-up sm:inline"
     >
       LIVE {size}

@@ -8,6 +8,7 @@ const fixture = (name: string) => readFileSync(new URL(`./fixtures/form4/${name}
 describe("parseForm4", () => {
   it("reads a sale: Apple's general counsel, 27 October 2026", () => {
     expect(parseForm4(fixture("aapl-sale.xml"))).toEqual({
+      issuerCik: 320193,
       owners: [{ name: "Newstead Jennifer", role: "SVP, GC and Government Affairs" }],
       trades: [{ date: "2026-10-27", code: "S", acquired: false, shares: 2399, price: 343.36, sharesAfter: 32396, direct: true }],
     });
@@ -15,6 +16,7 @@ describe("parseForm4", () => {
 
   it("reads an open-market buy held indirectly: Intel's CEO, 11 August 2026", () => {
     expect(parseForm4(fixture("intc-buy.xml"))).toEqual({
+      issuerCik: 50863,
       owners: [{ name: "TAN LIP BU", role: "CEO, Director" }],
       trades: [{ date: "2026-08-11", code: "P", acquired: true, shares: 105263, price: 95, sharesAfter: 1314669, direct: false }],
     });
@@ -30,13 +32,14 @@ describe("parseForm4", () => {
 
   it("reads a gift filed at $0, with role flags written as 1 and 0: an Nvidia director, 7 October 2026", () => {
     expect(parseForm4(fixture("nvda-gift.xml"))).toEqual({
+      issuerCik: 1045810,
       owners: [{ name: "COXE TENCH", role: "Director" }],
       trades: [{ date: "2026-10-07", code: "G", acquired: false, shares: 500000, price: 0, sharesAfter: 23671360, direct: false }],
     });
   });
 
   it("gives no rows for a filing with no common-stock transactions, and counts a missing flag as false", () => {
-    expect(parseForm4(fixture("jpm-holdings.xml"))).toEqual({ owners: [{ name: "Lake Marianne", role: "CEO CCB" }], trades: [] });
+    expect(parseForm4(fixture("jpm-holdings.xml"))).toEqual({ issuerCik: 19617, owners: [{ name: "Lake Marianne", role: "CEO CCB" }], trades: [] });
   });
 
   it("lists every owner of a joint filing", () => {
@@ -96,7 +99,7 @@ describe("toInsiderTrades", () => {
   });
 
   it("names every owner of a joint filing", () => {
-    const form = { owners: [{ name: "A", role: "Director" }, { name: "B", role: "10% owner" }, { name: "C", role: "Director" }], trades: [] };
+    const form = { issuerCik: 1, owners: [{ name: "A", role: "Director" }, { name: "B", role: "10% owner" }, { name: "C", role: "Director" }], trades: [] };
     const trade = { date: "2026-08-11", code: "P", acquired: true, shares: 1, direct: true };
     expect(toInsiderTrades({ ...form, trades: [trade] }, filing)[0]).toMatchObject({ insider: "A, B and C", role: "Director; 10% owner" });
   });

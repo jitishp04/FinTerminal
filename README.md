@@ -49,7 +49,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `<SYM> DES` | Company overview and key stats |
 | `<SYM> FA` | Income statement, balance sheet and cash flow |
 | `<SYM> CF` | SEC filings |
-| `<SYM> INS` | Insider filings: Forms 3, 4 and 5 |
+| `<SYM> INS` | Insider trades from Form 4s, and the Forms 3, 4 and 5 filed |
 | `<SYM> DCA` | Dollar-cost averaging backtest: every schedule against a lump sum |
 | `<SYM> DCF` | DCF valuation: a range of values per share, with every assumption shown |
 | `W` | Your watchlist |

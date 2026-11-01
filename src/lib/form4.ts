@@ -25,6 +25,8 @@ export interface Form4Trade {
 }
 
 export interface Form4 {
+  /** The company whose stock this is: a large holder files Form 4s about other companies too. */
+  issuerCik: number;
   owners: Form4Owner[];
   /** Common stock and other non-derivative lines only, in the filing's order. */
   trades: Form4Trade[];
@@ -105,13 +107,13 @@ export function parseForm4(xml: string): Form4 {
       direct: text(line, "directOrIndirectOwnership") !== "I",
     };
   });
-  return { owners, trades };
+  return { issuerCik: Number(text(xml, "issuerCik")), owners, trades };
 }
 
 const joined = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
 /** A parsed filing's transactions as rows, each with its filers and the filing. */
-export function toInsiderTrades({ owners, trades }: Form4, filing: Filing): InsiderTrade[] {
+export function toInsiderTrades({ owners, trades }: Pick<Form4, "owners" | "trades">, filing: Filing): InsiderTrade[] {
   const insider = joined(owners.map((o) => o.name));
   const role = [...new Set(owners.map((o) => o.role).filter(Boolean))].join("; ");
   return trades.map((trade) => ({ insider, role, ...trade, filed: filing.filed, url: filing.url }));

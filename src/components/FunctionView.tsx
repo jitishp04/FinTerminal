@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { Command } from "@/lib/commands";
-import { FILING_FILTERS, INSIDER_FILTERS } from "@/lib/filings";
+import { FILING_FILTERS } from "@/lib/filings";
 import { MONITORS } from "@/lib/monitors";
 import { Help } from "./functions/Help";
 
@@ -19,6 +19,10 @@ const FinancialStatements = dynamic(
   () => import("./functions/FinancialStatements").then((m) => m.FinancialStatements),
   { ssr: false, loading: () => <p className="text-muted">Loading statements…</p> },
 );
+const InsiderActivity = dynamic(() => import("./functions/InsiderActivity").then((m) => m.InsiderActivity), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading insider trades…</p>,
+});
 const FilingsList = dynamic(() => import("./functions/FilingsList").then((m) => m.FilingsList), {
   ssr: false,
   loading: () => <p className="text-muted">Loading filings…</p>,
@@ -69,9 +73,8 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "GP" && command.symbol) return <PriceChart symbol={command.symbol} />;
   if (command.fn === "DES" && command.symbol) return <CompanyOverview symbol={command.symbol} />;
   if (command.fn === "FA" && command.symbol) return <FinancialStatements symbol={command.symbol} />;
-  // Keyed so that going from one to the other resets the chosen filter, which belongs to the first.
-  if (command.fn === "CF" && command.symbol) return <FilingsList key="CF" symbol={command.symbol} filters={FILING_FILTERS} />;
-  if (command.fn === "INS" && command.symbol) return <FilingsList key="INS" symbol={command.symbol} filters={INSIDER_FILTERS} />;
+  if (command.fn === "CF" && command.symbol) return <FilingsList symbol={command.symbol} filters={FILING_FILTERS} />;
+  if (command.fn === "INS" && command.symbol) return <InsiderActivity symbol={command.symbol} />;
   if (command.fn === "DCA" && command.symbol) return <DcaBacktest symbol={command.symbol} />;
   if (command.fn === "DCF" && command.symbol) return <DcfValuation symbol={command.symbol} />;
   if (command.fn === "ECO") {

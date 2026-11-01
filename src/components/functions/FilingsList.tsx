@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { filingsUrl, formName, isInsiderForm, type FilingFilter } from "@/lib/filings";
 import type { Filings } from "@/lib/types";
@@ -12,8 +12,8 @@ import { Toggle } from "./Toggle";
 // The server keeps a company's list for an hour.
 const STALE_AFTER = 60 * 60_000;
 
-/** CF and INS: a company's recent SEC filings of the chosen kind, each linking to its document. */
-export function FilingsList({ symbol, filters }: { symbol: string; filters: FilingFilter[] }) {
+/** CF and INS: a company's recent SEC filings of the chosen kind, each linking to its document. `controls` go above the filters. */
+export function FilingsList({ symbol, filters, controls }: { symbol: string; filters: FilingFilter[]; controls?: ReactNode }) {
   const [filter, setFilter] = useState(filters[0]);
   // No placeholder data: another company's filings must never show under this one's name.
   const filings = useQuery({
@@ -25,6 +25,7 @@ export function FilingsList({ symbol, filters }: { symbol: string; filters: Fili
   return (
     <div className="flex h-full flex-col gap-1.5">
       <QuoteLine symbol={symbol} />
+      {controls}
       <div role="group" aria-label="Form" className="flex flex-wrap items-center gap-0.5 text-xs">
         {filters.map((option) => (
           <Toggle key={option.label} pressed={option === filter} onClick={() => setFilter(option)}>

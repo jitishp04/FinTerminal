@@ -132,11 +132,12 @@ export async function filings(symbol: string, forms: string[]): Promise<Filings>
 
 /**
  * The common-stock transactions in a company's latest Form 4 filings, newest first.
- * Amendments are left out, so a corrected filing isn't counted twice. A filing that
- * can't be read is skipped and counted.
+ * Amendments are left out, so a corrected filing isn't counted twice, and so are filings
+ * about another company's stock. A filing that can't be read is skipped and counted.
  */
 export async function insiderTrades(symbol: string): Promise<InsiderTrades> {
   const { name, filings: recent } = await filings(symbol, ["4"]);
+  const company = (await companies()).get(symbol)!;
   const form4s = recent.filter(({ form }) => form === "4").slice(0, FORM4_FILINGS);
   const parsed = await Promise.allSettled(
     form4s.map(({ url }) =>
@@ -147,13 +148,15 @@ export async function insiderTrades(symbol: string): Promise<InsiderTrades> {
       }),
     ),
   );
-  const trades = parsed.flatMap((result, i) => (result.status === "fulfilled" ? toInsiderTrades(result.value, form4s[i]) : []));
+  const own = (result: (typeof parsed)[number]) => result.status === "fulfilled" && result.value.issuerCik === company.cik;
+  const trades = parsed.flatMap((result, i) => (result.status === "fulfilled" && own(result) ? toInsiderTrades(result.value, form4s[i]) : []));
   return {
     symbol,
     name,
     trades: trades.sort((a, b) => b.date.localeCompare(a.date) || b.filed.localeCompare(a.filed)),
     filings: form4s.length,
     skipped: parsed.filter((result) => result.status === "rejected").length,
+    aboutOthers: parsed.filter((result) => result.status === "fulfilled" && !own(result)).length,
     since: form4s.at(-1)?.filed,
   };
 }

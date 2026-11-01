@@ -52,9 +52,9 @@ export const FUNCTIONS: FunctionDef[] = [
   },
   {
     code: "INS",
-    title: "Insider filings",
-    description: "Forms 3, 4 and 5 filed by executives and directors",
-    keywords: ["insiders", "insider trading", "form 4"],
+    title: "Insider trades",
+    description: "What executives and directors bought and sold, from their Form 4s",
+    keywords: ["insiders", "insider trading", "insider buying", "form 4"],
     group: "Security",
     symbol: "required",
     example: "AAPL INS",

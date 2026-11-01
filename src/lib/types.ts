@@ -124,6 +124,8 @@ export interface InsiderTrades {
   /** How many Form 4 filings were read, and how many of those couldn't be. */
   filings: number;
   skipped: number;
+  /** Filings about another company's stock, which a large holder files too, and which are left out. */
+  aboutOthers: number;
   /** When the oldest of them was filed. */
   since?: string;
 }

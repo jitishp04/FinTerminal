@@ -20,7 +20,7 @@ Work moves between the user's Windows PC and cloud sessions (claude.ai/code, the
 - **Picking up cloud work locally**: `git fetch` and check out the branch the cloud session pushed (`claude --teleport` also brings the conversation).
 - **Dependencies**: a SessionStart hook (`.claude/hooks/install-deps.mjs`) runs `npm ci` whenever `package.json` or `package-lock.json` changed since the last install, in both places. Keep the lockfile in sync: change dependencies only with `npm install`, and commit `package-lock.json` alongside `package.json`.
 - **Detecting the cloud**: `CLAUDE_CODE_REMOTE=true`. There, no one can open the browser preview, so verify with `npm test`, `npm run typecheck`, `npm run build`, and `curl` against `npm run dev`, and say in the PR that the browser check is still to do.
-- **Cloud environment** (the user sets it once at claude.ai/code): network access **Custom** with the default list plus `*.yahoo.com`, `*.sec.gov`, `api.stlouisfed.org`, `finnhub.io`, `ws.finnhub.io`, `ws-feed.exchange.coinbase.com`. Keys go in as environment variables with the same names as `.env.local`, which Next.js reads either way.
+- **Cloud environment** (the user sets it once at claude.ai/code): network access **Custom** with the default list plus `*.yahoo.com`, `*.sec.gov`, `api.stlouisfed.org`, `finnhub.io`, `ws.finnhub.io`, `ws-feed.exchange.coinbase.com`, `cdn.cboe.com`. Keys go in as environment variables with the same names as `.env.local`, which Next.js reads either way.
 
 ## Stack
 Next.js 16 (App Router, `cacheComponents` on) + TypeScript + Tailwind v4 · TanStack Query · TradingView `lightweight-charts` · Vitest.
@@ -43,6 +43,7 @@ src/components/functions/*.tsx   one component per function code
 | Quote fallback (US stocks) | Finnhub | `FINNHUB_API_KEY` |
 | Live trades (US stocks and funds) | Finnhub websocket, one per server, fanned out over SSE (`/api/stream`) | `FINNHUB_API_KEY` |
 | Live trades (`CRYPTO`'s coins) | Coinbase Exchange's public websocket, through the same hub and SSE stream | none |
+| Put/call ratio (`THS`'s Market mood) | Cboe's public daily statistics files | none |
 | Financial statements, filings, insider Form 4s | SEC EDGAR (≤10 req/s) | `SEC_USER_AGENT` (required contact header) |
 | Macro series, Treasury yield curve | FRED | `FRED_API_KEY` |
 
@@ -54,4 +55,4 @@ src/components/functions/*.tsx   one component per function code
 - `npm test`: Vitest
 - `npm run build` / `npm run lint` / `npm run typecheck` (runs `next typegen` first: route types like `LayoutProps` are generated)
 - `npm run check:keys`: after a build, fails if a value from `.env.local` reached the client files
-- `FAIL_SOURCES=yahoo,sec,fred,finnhub,coinbase` in `.env.local` forces sources to fail, to try out the panels' failure states
+- `FAIL_SOURCES=yahoo,sec,fred,finnhub,coinbase,cboe` in `.env.local` forces sources to fail, to try out the panels' failure states

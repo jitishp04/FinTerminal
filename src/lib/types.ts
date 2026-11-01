@@ -244,6 +244,18 @@ export interface Thesis extends Weekly {
   earnings: number[];
 }
 
+/** One input to Market mood, scored 0 to 100, or with no score if its data isn't available. */
+export interface MoodPart {
+  name: string;
+  score?: number;
+}
+
+/** A market-wide score after CNN's Fear & Greed Index. It has no score with no inputs. */
+export interface Mood {
+  score?: number;
+  parts: MoodPart[];
+}
+
 /** One option contract, as Yahoo quotes it, 15 minutes delayed. */
 export interface OptionContract {
   /** The OCC symbol, e.g. "AAPL261120C00275000". */

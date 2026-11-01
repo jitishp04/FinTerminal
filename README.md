@@ -52,7 +52,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `<SYM> INS` | Insider trades from Form 4s, and the Forms 3, 4 and 5 filed |
 | `<SYM> DCA` | Dollar-cost averaging backtest: every schedule against a lump sum |
 | `<SYM> DCF` | DCF valuation: a range of values per share, with every assumption shown |
-| `<SYM> THS` | Thesis check: weekly candles with the 40-week line, Bollinger Bands, relative strength, RSI and buy signals, with a summary table |
+| `<SYM> THS` | Thesis check: weekly candles with the 40-week line, Bollinger Bands, relative strength, RSI and buy signals, with a summary table and Market mood |
 | `<SYM> OMON` | Options chain: calls and puts by strike for one expiration, around the price |
 | `W` | Your watchlist |
 | `WEI` | World indices |
@@ -103,6 +103,7 @@ Panels show the message in the first column. Fuller errors appear in the termina
 | `SEC EDGAR isn't responding`, and the terminal says `The SEC answered 403` | The SEC refused the request. Check that `SEC_USER_AGENT` isn't blank. The other cause is too many requests, and the SEC's page for that is titled "Request Rate Threshold Exceeded": wait a few minutes before trying again. |
 | `Yahoo Finance isn't responding`, and the terminal mentions a crumb, such as `Failed to get crumb` | The session the app keeps with Yahoo failed. Restart `npm run dev`. If the status in the message is 429, Yahoo is limiting your connection, so wait a while first. If `Could not find crumb` persists, Yahoo may have changed something: run `npm install yahoo-finance2@latest`. With a Finnhub key, US stock quotes keep working in the meantime. |
 | Finnhub shows `DOWN`, there's no `LIVE` in the status bar, and the terminal says `Finnhub's stream failed before it opened` | The live stream can't reach Finnhub. It retries by itself, waiting longer each time, up to a minute, and meanwhile prices refresh every 10 seconds. Check `FINNHUB_API_KEY`, and that your network lets through `ws.finnhub.io`. |
+| `THS` shows Market mood with `(4/7)` or fewer | Each input needs its source. Five have one, so `(5/7)` is the most it shows: there's no free history of NYSE highs and lows or of up and down volume. Fewer means a source is failing, or `FRED_API_KEY` is missing. Point at the score to see which inputs it used. |
 | Coinbase shows `DOWN`, and the terminal says `Coinbase's stream failed before it opened` | The live crypto stream can't reach Coinbase. It retries the same way, and crypto prices refresh every 10 seconds meanwhile. Check that your network lets through `ws-feed.exchange.coinbase.com`. |
 | `Can't reach the FinTerminal server.` | `npm run dev` has stopped. Start it again. |
 | Something is failing that shouldn't be | Check whether `FAIL_SOURCES` is set in `.env.local`. See below. |
@@ -112,7 +113,7 @@ Panels show the message in the first column. Fuller errors appear in the termina
 
 ### Trying out a failure
 
-To see what the panels do when a source fails, add this to `.env.local`, using any of `yahoo`, `sec`, `fred`, `finnhub` and `coinbase`:
+To see what the panels do when a source fails, add this to `.env.local`, using any of `yahoo`, `sec`, `fred`, `finnhub`, `coinbase` and `cboe`:
 
 ```
 FAIL_SOURCES=yahoo
@@ -136,4 +137,4 @@ The roadmap lives in GitHub issues and milestones. Each issue gets its own branc
 
 ## Data sources
 
-Yahoo Finance (unofficial, via `yahoo-finance2`; personal use only), SEC EDGAR, FRED and Finnhub. Prices may be delayed. Nothing here is investment advice.
+Yahoo Finance (unofficial, via `yahoo-finance2`; personal use only), SEC EDGAR, FRED, Finnhub, Coinbase and Cboe. Prices may be delayed. Nothing here is investment advice.

@@ -132,6 +132,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "MOST",
   },
   {
+    code: "EQS",
+    title: "Stock screener",
+    description: "Yahoo's stock screens, sortable, with market-cap and P/E filters",
+    keywords: ["screener", "stock screener", "screen", "undervalued", "growth stocks", "small caps", "most shorted", "value stocks"],
+    group: "Market",
+    symbol: "none",
+    example: "EQS",
+  },
+  {
     code: "N",
     title: "News",
     description: "Headlines by topic, or about one symbol, e.g. AAPL N",

@@ -58,6 +58,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `SECT` | Sector heatmap |
 | `ROT` | Sector rotation: trend and momentum against SPY |
 | `MOST` | Top movers |
+| `EQS` | Stock screener: Yahoo's screens, sortable, with market-cap and P/E filters |
 | `N` | News by topic: markets, forex, crypto, mergers |
 | `<SYM> N` | News about one symbol |
 | `FX` | Currencies |

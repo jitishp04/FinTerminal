@@ -78,6 +78,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "MSFT DCF",
   },
   {
+    code: "OMON",
+    title: "Options chain",
+    description: "Calls and puts by strike for one expiration, around the price",
+    keywords: ["options", "option chain", "calls", "puts", "strikes", "implied volatility", "open interest", "derivatives"],
+    group: "Security",
+    symbol: "required",
+    example: "AAPL OMON",
+  },
+  {
     code: "W",
     title: "Watchlist",
     description: "Your symbols with live prices",

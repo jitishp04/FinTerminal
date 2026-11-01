@@ -194,7 +194,8 @@ export function toOptionChain(symbol: string, raw: OptionsResult | undefined): O
   const price = raw?.quote?.regularMarketPrice;
   if (!raw || typeof price !== "number") throw new ApiError(404, `No data for ${symbol}`);
   const chain = raw.options[0];
-  if (raw.expirationDates.length === 0 || !chain) throw new ApiError(404, `${symbol} has no listed options`);
+  // A symbol with no options comes with no expirations and no chain.
+  if (!chain) throw new ApiError(404, `${symbol} has no listed options`);
   const byStrike = (a: OptionContract, b: OptionContract) => a.strike - b.strike;
   return {
     symbol,

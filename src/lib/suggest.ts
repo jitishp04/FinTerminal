@@ -9,7 +9,7 @@ const SYMBOL_FUNCTIONS = FUNCTIONS.filter((f) => f.symbol !== "none");
  * panel's command: a bare function reuses its symbol ("DES" → "AAPL DES"), and a
  * bare ticker keeps its function ("MSFT" → "MSFT DES").
  */
-export function suggest(input: string, current?: Command, limit = 8): Command[] {
+export function suggest(input: string, current?: Command, limit = 10): Command[] {
   const text = input.trim().toUpperCase().replace(/\s+/g, " ");
   if (!text) return [];
 

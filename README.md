@@ -52,6 +52,7 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `<SYM> INS` | Insider trades from Form 4s, and the Forms 3, 4 and 5 filed |
 | `<SYM> DCA` | Dollar-cost averaging backtest: every schedule against a lump sum |
 | `<SYM> DCF` | DCF valuation: a range of values per share, with every assumption shown |
+| `<SYM> OMON` | Options chain: calls and puts by strike for one expiration, around the price |
 | `W` | Your watchlist |
 | `WEI` | World indices |
 | `SECT` | Sector heatmap |

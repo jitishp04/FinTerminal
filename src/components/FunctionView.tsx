@@ -35,6 +35,10 @@ const DcfValuation = dynamic(() => import("./functions/DcfValuation").then((m) =
   ssr: false,
   loading: () => <p className="text-muted">Loading filings and prices…</p>,
 });
+const NewsFeed = dynamic(() => import("./functions/NewsFeed").then((m) => m.NewsFeed), {
+  ssr: false,
+  loading: () => <p className="text-muted">Loading headlines…</p>,
+});
 const MacroDashboard = dynamic(() => import("./functions/MacroDashboard").then((m) => m.MacroDashboard), {
   ssr: false,
   loading: () => <p className="text-muted">Loading indicators…</p>,
@@ -85,6 +89,8 @@ export function FunctionView({ command, onOpen }: { command: Command; onOpen: (c
   if (command.fn === "SECT") return <SectorHeatmap onOpen={onOpen} />;
   if (command.fn === "ROT") return <SectorRotation onOpen={onOpen} />;
   if (command.fn === "MOST") return <TopMovers onOpen={onOpen} />;
+  // Keyed, so a symbol's news and the market's keep their own topic and scroll.
+  if (command.fn === "N") return <NewsFeed key={command.symbol ?? ""} symbol={command.symbol} />;
   const monitor = MONITORS[command.fn];
   return monitor ? <QuoteMonitor groups={monitor} onOpen={onOpen} /> : null;
 }

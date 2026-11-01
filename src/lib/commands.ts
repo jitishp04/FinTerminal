@@ -26,7 +26,7 @@ export function parseCommand(input: string): ParseResult {
   const [first, second] = tokens.map((t) => FUNCTION_BY_CODE.get(t));
 
   // Check "<SYM> <FN>" first so tickers that collide with codes still work ("W GP").
-  if (second?.symbol === "required") return build(second, tokens[0], tokens.slice(2));
+  if (second && second.symbol !== "none") return build(second, tokens[0], tokens.slice(2));
   if (first) {
     if (first.symbol === "required") return fail(`${first.code} needs a symbol, e.g. ${first.example}`);
     return build(first, undefined, tokens.slice(1));

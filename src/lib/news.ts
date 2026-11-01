@@ -53,15 +53,33 @@ export interface FinnhubNews {
   url: string;
 }
 
+// A run of characters that are really UTF-8 bytes: a lead byte, then continuation bytes.
+const LATIN1_UTF8 = /[\xC2-\xF4][\x80-\xBF]+/g;
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * Text whose UTF-8 was read as Latin-1, as in a few of Seeking Alpha's items, put right:
+ * "Street\u00E2\u0080\u0099s" back to "Street's". A run that isn't valid UTF-8 is a real accent, and stays.
+ */
+function repair(text: string): string {
+  return text.replace(LATIN1_UTF8, (run) => {
+    try {
+      return utf8.decode(Uint8Array.from(run, (c) => c.charCodeAt(0)));
+    } catch {
+      return run;
+    }
+  });
+}
+
 /** Finnhub's news items, which link through its own redirect. */
 export function fromFinnhub(items: FinnhubNews[]): NewsItem[] {
   return items.map(({ datetime, headline, source, summary, url }) => ({
-    title: headline,
+    title: repair(headline),
     url,
     time: datetime,
     // The name Yahoo's own feed goes by, so one source has one name.
     source: source === "Yahoo" ? "Yahoo Finance" : source,
-    ...(summary && { summary }),
+    ...(summary && { summary: repair(summary) }),
   }));
 }
 

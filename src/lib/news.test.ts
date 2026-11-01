@@ -46,6 +46,14 @@ describe("fromFinnhub", () => {
     expect(first.url).toMatch(/^https:\/\/finnhub\.io\/api\/news\?id=/);
   });
 
+  it("repairs text whose UTF-8 was read as Latin-1, as in some of Seeking Alpha's, and leaves real accents alone", () => {
+    // The real summary has "Street" then U+00E2 U+0080 U+0099: the bytes of a curly apostrophe, one character each.
+    const [first] = fromFinnhub(JSON.parse(fixture("aapl-finnhub.json")));
+    expect(first.summary).toMatch(/^Wall Street\u2019s big week/);
+    const [accented] = fromFinnhub([{ datetime: 1, headline: "Nestlé and Société Générale", source: "B", summary: "", url: "https://example.com" }]);
+    expect(accented.title).toBe("Nestlé and Société Générale");
+  });
+
   it("calls Yahoo by the name its own feed goes by", () => {
     const [item] = fromFinnhub([{ datetime: 1, headline: "A", source: "Yahoo", summary: "", url: "https://example.com" }]);
     expect(item.source).toBe("Yahoo Finance");

@@ -6,8 +6,8 @@ export interface FunctionDef {
   /** Plain words that find this function in search, e.g. "chart" → GP. */
   keywords: string[];
   group: "Security" | "Market" | "Macro" | "System";
-  /** "required": typed as `<SYM> <CODE>`. "none": typed as `<CODE>`. */
-  symbol: "required" | "none";
+  /** "required": typed as `<SYM> <CODE>`. "none": typed as `<CODE>`. "optional": either. */
+  symbol: "required" | "none" | "optional";
   /** Accepts one optional argument after the code, e.g. `ECO UNRATE`. */
   arg?: "optional";
   example: string;
@@ -121,6 +121,15 @@ export const FUNCTIONS: FunctionDef[] = [
     group: "Market",
     symbol: "none",
     example: "MOST",
+  },
+  {
+    code: "N",
+    title: "News",
+    description: "Headlines by topic, or about one symbol, e.g. AAPL N",
+    keywords: ["news", "headlines", "stories", "articles"],
+    group: "Market",
+    symbol: "optional",
+    example: "N",
   },
   {
     code: "FX",

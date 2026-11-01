@@ -39,6 +39,15 @@ describe("parseCommand", () => {
     expect(ok("W")).toEqual({ fn: "W", args: [] });
   });
 
+  it("takes an optional symbol for N: market news on its own, a symbol's news with one", () => {
+    expect(ok("n")).toEqual({ fn: "N", args: [] });
+    expect(ok("aapl n")).toEqual({ fn: "N", symbol: "AAPL", args: [] });
+    expect(ok("BRK-B N")).toEqual({ fn: "N", symbol: "BRK-B", args: [] });
+    // A ticker called N, charted.
+    expect(ok("N GP")).toEqual({ fn: "GP", symbol: "N", args: [] });
+    expect(error("N AAPL")).toMatch(/takes no arguments/);
+  });
+
   it("rejects empty input", () => {
     expect(error("")).toMatch(/type a command/i);
     expect(error("   ")).toMatch(/type a command/i);
@@ -80,6 +89,8 @@ describe("commandTitle", () => {
     ["AAPL GP", "AAPL · Price chart"],
     ["ECO UNRATE", "Economy · UNRATE"],
     ["W", "Watchlist"],
+    ["N", "News"],
+    ["AAPL N", "AAPL · News"],
   ])("%s → %s", (input, expected) => {
     const result = parseCommand(input);
     if (!result.ok) throw new Error(result.error);

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createHub, FLUSH_EVERY, IDLE, LINGER, MAX_STREAMED, type Socket, type Watcher } from "./finnhubStream";
+import { finnhubFeed } from "./finnhubStream";
+import { createHub, FLUSH_EVERY, IDLE, LINGER, type Socket, type Watcher } from "./stream";
 import { health, resetHealth } from "./health";
 
 class FakeSocket {
@@ -49,12 +50,18 @@ class FakeSocket {
 let sockets: FakeSocket[];
 const latest = () => sockets.at(-1)!;
 
+const MAX_STREAMED = finnhubFeed.max;
+
+// The hub, on Finnhub's feed, with fake sockets.
 function setup() {
   sockets = [];
-  return createHub(() => {
-    const socket = new FakeSocket();
-    sockets.push(socket);
-    return socket as unknown as Socket;
+  return createHub({
+    ...finnhubFeed,
+    connect: () => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket as unknown as Socket;
+    },
   });
 }
 

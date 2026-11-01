@@ -1,7 +1,8 @@
 import { formatCommand, isArg, isSymbol, parseCommand, type Command } from "./commands";
 import { FUNCTION_BY_CODE, FUNCTIONS, type FunctionDef } from "./functions";
 
-const SECURITY_FUNCTIONS = FUNCTIONS.filter((f) => f.symbol === "required");
+// Every function that can take a symbol: AAPL GP, and AAPL N too.
+const SYMBOL_FUNCTIONS = FUNCTIONS.filter((f) => f.symbol !== "none");
 
 /**
  * What to offer for the command bar's text, best first. `current` is the focused
@@ -24,7 +25,11 @@ export function suggest(input: string, current?: Command, limit = 8): Command[] 
 
   // The whole text names a function: "DES", "movers", "yield curve".
   const named = matchFunctions(text);
-  for (const fn of named) add(openFunction(fn, current?.symbol));
+  for (const fn of named) {
+    add(openFunction(fn, current?.symbol));
+    // N for the panel's symbol, and N on its own.
+    if (fn.symbol === "optional") add(openFunction(fn));
+  }
 
   // A ticker (or ECO's series id) beside a function, either order: "AAPL chart", "chart AAPL", "economy UNRATE".
   const tokens = text.split(" ");
@@ -33,11 +38,11 @@ export function suggest(input: string, current?: Command, limit = 8): Command[] 
     const last = tokens[tokens.length - 1];
     if (isSymbol(first)) {
       for (const fn of matchFunctions(tokens.slice(1).join(" "))) {
-        if (fn.symbol === "required") add({ fn: fn.code, symbol: first, args: [] });
+        if (fn.symbol !== "none") add({ fn: fn.code, symbol: first, args: [] });
       }
     }
     for (const fn of matchFunctions(tokens.slice(0, -1).join(" "))) {
-      if (fn.symbol === "required" && isSymbol(last)) add({ fn: fn.code, symbol: last, args: [] });
+      if (fn.symbol !== "none" && isSymbol(last)) add({ fn: fn.code, symbol: last, args: [] });
       else if (fn.arg && isArg(last)) add({ fn: fn.code, args: [last] });
     }
   }
@@ -46,16 +51,16 @@ export function suggest(input: string, current?: Command, limit = 8): Command[] 
   // Words that also name a function ("gold") get one ticker row, not five.
   if (tokens.length === 1 && isSymbol(text) && !FUNCTION_BY_CODE.has(text)) {
     const currentFn = current && FUNCTION_BY_CODE.get(current.fn);
-    const fns = currentFn?.symbol === "required" ? [currentFn, ...SECURITY_FUNCTIONS] : SECURITY_FUNCTIONS;
+    const fns = currentFn && currentFn.symbol !== "none" ? [currentFn, ...SYMBOL_FUNCTIONS] : SYMBOL_FUNCTIONS;
     for (const fn of named.length > 0 ? fns.slice(0, 1) : fns) add({ fn: fn.code, symbol: text, args: [] });
   }
 
   return found.slice(0, limit);
 }
 
-/** A function with nothing else typed. Symbol functions use `symbol`, or their example's. */
+/** A function with nothing else typed. Symbol functions use `symbol`, or their example's; N goes without. */
 export function openFunction(fn: FunctionDef, symbol?: string): Command {
-  if (fn.symbol === "none") return { fn: fn.code, args: [] };
+  if (fn.symbol === "none" || (fn.symbol === "optional" && !symbol)) return { fn: fn.code, args: [] };
   return { fn: fn.code, symbol: symbol ?? fn.example.split(" ")[0], args: [] };
 }
 

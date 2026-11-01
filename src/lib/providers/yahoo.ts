@@ -5,7 +5,8 @@ import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-ifa
 import { ApiError } from "../api";
 import { cached } from "../cache";
 import { wallClock } from "../chartData";
-import type { Bar, Chart, ChartRange, History, MoverType, Profile, Quote } from "../types";
+import { parseRss } from "../news";
+import type { Bar, Chart, ChartRange, History, MoverType, NewsItem, Profile, Quote } from "../types";
 import { tracked } from "./health";
 
 // Unofficial, keyless and for personal use: the library keeps Yahoo's cookie and crumb.
@@ -20,6 +21,9 @@ const QUOTE_TTL = 8 * SECOND;
 // Under the 60 s poll, for the same reason.
 const MOVERS_TTL = 50 * SECOND;
 const PROFILE_TTL = 60 * MINUTE;
+// Under the news panel's 5-minute refresh, so each refresh gets a fresh feed.
+const NEWS_TTL = 4 * MINUTE;
+const NEWS_FEED = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 // Daily closes change once a day, and a full history is a big download.
 const HISTORY_TTL = 4 * 60 * MINUTE;
 
@@ -127,6 +131,17 @@ export function history(symbol: string): Promise<History> {
         events: "div",
       });
       return toHistory(meta, quotes, events?.dividends ?? [], new Date());
+    }),
+  );
+}
+
+/** The headlines in Yahoo's RSS feed for a symbol, which is empty for one it doesn't know. */
+export function news(symbol: string): Promise<NewsItem[]> {
+  return cached(`news:${symbol}`, NEWS_TTL, () =>
+    tracked("yahoo", async () => {
+      const response = await fetch(`${NEWS_FEED}?s=${encodeURIComponent(symbol)}&region=US&lang=en-US`);
+      if (!response.ok) throw new Error(`Yahoo's news feed answered ${response.status} for ${symbol}`);
+      return parseRss(await response.text());
     }),
   );
 }

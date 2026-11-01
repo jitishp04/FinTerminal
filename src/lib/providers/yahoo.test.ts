@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearCache } from "../cache";
-import { chart, history, movers, profile, quote, sessionStart } from "./yahoo";
+import { chart, history, movers, news, profile, quote, sessionStart } from "./yahoo";
 
 const yahoo = vi.hoisted(() => ({ quote: vi.fn(), chart: vi.fn(), quoteSummary: vi.fn(), screener: vi.fn() }));
 
@@ -385,5 +386,27 @@ describe("profile", () => {
   it("answers an unknown symbol with a 404", async () => {
     yahoo.quoteSummary.mockRejectedValue(new Error("Quote not found for symbol: ZZZZ"));
     await expect(profile("ZZZZ")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("news", () => {
+  it("reads Yahoo's RSS feed for the symbol", async () => {
+    const feed = readFileSync(new URL("../fixtures/news/aapl-yahoo.xml", import.meta.url), "utf8");
+    const fetchStub = vi.fn(async () => new Response(feed, { status: 200 }));
+    vi.stubGlobal("fetch", fetchStub);
+
+    const items = await news("BRK-B");
+    vi.unstubAllGlobals();
+
+    expect(fetchStub.mock.calls[0]).toEqual(["https://feeds.finance.yahoo.com/rss/2.0/headline?s=BRK-B&region=US&lang=en-US"]);
+    expect(items).toHaveLength(16);
+  });
+
+  it("treats a failed feed as Yahoo not responding", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 503 })));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(news("AAPL")).rejects.toMatchObject({ status: 502, message: "Yahoo Finance isn't responding. Retrying…" });
+    vi.unstubAllGlobals();
   });
 });

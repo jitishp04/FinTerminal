@@ -50,8 +50,17 @@ describe("suggest", () => {
   });
 
   it("offers every security function for a lone ticker, keeping the panel's function first", () => {
-    expect(offered("msft", "AAPL DES")).toEqual(["MSFT DES", "MSFT GP", "MSFT FA", "MSFT CF", "MSFT INS", "MSFT DCA", "MSFT DCF"]);
+    expect(offered("msft", "AAPL DES")).toEqual(["MSFT DES", "MSFT GP", "MSFT FA", "MSFT CF", "MSFT INS", "MSFT DCA", "MSFT DCF", "MSFT N"]);
+    expect(offered("msft", "N")[0]).toBe("MSFT N");
     expect(offered("msft", "WEI")[0]).toBe("MSFT GP");
+  });
+
+  it("offers N both ways: for the panel's symbol, and on its own", () => {
+    // Then one row for a ticker called NEWS, as for any word that names a function.
+    expect(offered("news", "AAPL DES").slice(0, 2)).toEqual(["AAPL N", "N"]);
+    expect(offered("news")[0]).toBe("N");
+    expect(offered("aapl news")).toContain("AAPL N");
+    expect(offered("headlines tsla")).toContain("TSLA N");
   });
 
   it("lists functions before a ticker that shares the name", () => {

@@ -94,6 +94,23 @@ export interface Filings {
   filings: Filing[];
 }
 
+export interface NewsItem {
+  title: string;
+  url: string;
+  /** Epoch seconds. */
+  time: number;
+  /** "Yahoo Finance", "SeekingAlpha", "fool.com", … */
+  source: string;
+  summary?: string;
+}
+
+export interface News {
+  /** Newest first, a story only once. */
+  items: NewsItem[];
+  /** Sources that failed or are off, and why. */
+  notes: string[];
+}
+
 /** One common-stock transaction from a Form 4. */
 export interface InsiderTrade {
   /** As filed, usually last name first. A joint filing's owners are joined with "and". */

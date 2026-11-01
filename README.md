@@ -35,7 +35,7 @@ Everything is free and none of it needs a credit card. Quotes and charts work wi
 |---|---|---|
 | `SEC_USER_AGENT` | `FA`, `CF`, `INS`, `DCF` | No signup. The SEC asks automated users to identify themselves, so enter your name and email, for example `FinTerminal Jane Doe jane@example.com`. |
 | `FRED_API_KEY` | `ECO`, `CURV`, `DCF` | Create a free account at [fredaccount.stlouisfed.org](https://fredaccount.stlouisfed.org/apikeys), then request a key. |
-| `FINNHUB_API_KEY` | A backup for US stock quotes when Yahoo fails | Register at [finnhub.io](https://finnhub.io/register) and copy the key from your dashboard. Optional. |
+| `FINNHUB_API_KEY` | A backup for US stock quotes when Yahoo fails, and more headlines in `N` | Register at [finnhub.io](https://finnhub.io/register) and copy the key from your dashboard. Optional. |
 
 The running server picks up a new key by itself. Reload the page afterwards.
 
@@ -57,6 +57,8 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | `SECT` | Sector heatmap |
 | `ROT` | Sector rotation: trend and momentum against SPY |
 | `MOST` | Top movers |
+| `N` | News by topic: markets, forex, crypto, mergers |
+| `<SYM> N` | News about one symbol |
 | `FX` | Currencies |
 | `CMDTY` | Commodities |
 | `ECO` | US economic indicators |

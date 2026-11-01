@@ -50,7 +50,7 @@ describe("suggest", () => {
   });
 
   it("offers every security function for a lone ticker, keeping the panel's function first", () => {
-    expect(offered("msft", "AAPL DES")).toEqual(["MSFT DES", "MSFT GP", "MSFT FA", "MSFT CF", "MSFT INS"]);
+    expect(offered("msft", "AAPL DES")).toEqual(["MSFT DES", "MSFT GP", "MSFT FA", "MSFT CF", "MSFT INS", "MSFT DCA"]);
     expect(offered("msft", "WEI")[0]).toBe("MSFT GP");
   });
 

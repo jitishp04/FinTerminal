@@ -60,6 +60,15 @@ export const FUNCTIONS: FunctionDef[] = [
     example: "AAPL INS",
   },
   {
+    code: "DCA",
+    title: "DCA backtest",
+    description: "How buying a fixed amount on a schedule would have done",
+    keywords: ["dca", "dollar cost averaging", "backtest", "regular investing", "lump sum"],
+    group: "Security",
+    symbol: "required",
+    example: "SPY DCA",
+  },
+  {
     code: "W",
     title: "Watchlist",
     description: "Your symbols with live prices",

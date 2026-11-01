@@ -95,6 +95,7 @@ Panels show the message in the first column. Fuller errors appear in the termina
 | Something is failing that shouldn't be | Check whether `FAIL_SOURCES` is set in `.env.local`. See below. |
 | `is not a function` in the terminal, or old behavior after switching git branches | The dev server is holding old code. Restart `npm run dev`. |
 | Port 3000 is in use | `npm run dev -- -p 3001` |
+| `npm ci` reports moderate vulnerabilities | They're in development tools, not the running app: `npm audit --omit=dev` finds none. Don't run `npm audit fix --force`, which makes breaking changes. |
 
 ### Trying out a failure
 

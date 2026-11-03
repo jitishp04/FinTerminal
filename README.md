@@ -73,10 +73,13 @@ Type anywhere to search, then press Enter to open the result in the focused pane
 | Key | Action |
 |---|---|
 | Tab | Next panel |
+| Backspace, or ← in a panel's title | Back to what the panel showed before |
 | Esc | Clear the search, or restore a maximized panel |
 | Double-click a panel's title | Maximize it |
 
-Your layout and watchlist are saved in the browser.
+Clicking a ticker in a list opens its thesis check (`THS`) in that panel. Each panel remembers its last 20 views for Back.
+
+Your layout, each panel's history and your watchlist are saved in the browser.
 
 ### The status bar
 

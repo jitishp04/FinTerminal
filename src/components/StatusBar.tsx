@@ -33,6 +33,7 @@ const NEW_YORK = new Intl.DateTimeFormat("en-US", { ...TIME, timeZone: "America/
 const HINTS = [
   ["Type", "search"],
   ["Tab", "next panel"],
+  ["Backspace", "back"],
   ["Esc", "clear"],
   ["Double-click title", "maximize"],
 ] as const;

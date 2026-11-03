@@ -35,6 +35,9 @@ export function parseCommand(input: string): ParseResult {
   return fail(`Unknown function: ${tokens[1] ?? tokens[0]}. Type HELP.`);
 }
 
+/** What clicking a ticker in a list opens: its thesis check. */
+export const tickerCommand = (symbol: string): Command => ({ fn: "THS", symbol, args: [] });
+
 /** Inverse of parseCommand: `{ fn: "GP", symbol: "AAPL" }` → `"AAPL GP"`. */
 export function formatCommand(command: Command): string {
   return [command.symbol, command.fn, ...command.args].filter(Boolean).join(" ");

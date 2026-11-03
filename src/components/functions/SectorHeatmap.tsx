@@ -1,6 +1,6 @@
 "use client";
 
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { HEAT_CAP, heatColor } from "@/lib/heatmap";
 import { SECTORS } from "@/lib/monitors";
@@ -8,7 +8,7 @@ import { QuotesError, useQuotes } from "./quotes";
 
 const SYMBOLS = SECTORS.map((sector) => sector.symbol);
 
-/** The 11 sectors as tiles colored by the day's change. Clicking one opens its chart here. */
+/** The 11 sectors as tiles colored by the day's change. Clicking one opens its thesis check here. */
 export function SectorHeatmap({ onOpen }: { onOpen: (command: Command) => void }) {
   const { quotes, error, hasData, loading } = useQuotes(SYMBOLS);
 
@@ -23,7 +23,7 @@ export function SectorHeatmap({ onOpen }: { onOpen: (command: Command) => void }
             <button
               key={symbol}
               type="button"
-              onClick={() => onOpen({ fn: "GP", symbol, args: [] })}
+              onClick={() => onOpen(tickerCommand(symbol))}
               style={{ backgroundColor: heatColor(quote?.changePercent) }}
               className="flex min-w-0 flex-col justify-between rounded-sm p-1.5 text-left transition-colors hover:outline hover:outline-foreground focus-visible:outline focus-visible:outline-amber"
             >

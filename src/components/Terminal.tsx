@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { formatCommand, type Command } from "@/lib/commands";
-import { PANEL_COUNT, parseLayout, serializeLayout, type Layout } from "@/lib/layout";
+import { goBack, openIn, PANEL_COUNT, parseLayout, serializeLayout, type Layout } from "@/lib/layout";
 import { getLayoutSnapshot, getServerLayoutSnapshot, saveLayout, subscribeLayout } from "@/lib/layoutStore";
 import { CommandBar } from "./CommandBar";
 import { FunctionView } from "./FunctionView";
@@ -16,9 +16,13 @@ export function Terminal() {
 
   const save = (next: Layout) => saveLayout(serializeLayout(next));
 
-  /** Shows `command` in panel `index` and focuses that panel. */
+  /** Shows `command` in panel `index` and focuses that panel. Back returns to what it showed. */
   function open(index: number, command: Command) {
-    save({ panels: layout.panels.map((p, i) => (i === index ? command : p)), focused: index });
+    save(openIn(layout, index, command));
+  }
+
+  function back(index: number) {
+    save(goBack(layout, index));
   }
 
   function focus(index: number) {
@@ -33,8 +37,16 @@ export function Terminal() {
       setMaximized(null);
       return;
     }
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    // Backspace goes back in the focused panel, unless it's deleting text.
+    if (e.key === "Backspace") {
+      if ((e.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+      e.preventDefault();
+      back(layout.focused);
+      return;
+    }
     // Tab / Shift+Tab cycle the focused panel, except inside other form fields.
-    if (e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key !== "Tab") return;
     if ((e.target as HTMLElement).closest("input:not([data-command-bar]), textarea, select, [contenteditable]")) return;
     e.preventDefault();
     focus((layout.focused + (e.shiftKey ? PANEL_COUNT - 1 : 1)) % PANEL_COUNT);
@@ -62,10 +74,12 @@ export function Terminal() {
             key={i}
             index={i}
             command={command}
+            previous={layout.history[i].at(-1)}
             focused={i === layout.focused}
             maximized={maximized === i}
             hidden={maximized !== null && maximized !== i}
             onFocus={() => focus(i)}
+            onBack={() => back(i)}
             onToggleMaximize={() => setMaximized(maximized === i ? null : i)}
           >
             <PanelBoundary command={formatCommand(command)}>

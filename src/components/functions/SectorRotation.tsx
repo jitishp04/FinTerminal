@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { fetchApi, pollEvery, RETRY_EVERY } from "@/lib/fetchApi";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { SECTORS } from "@/lib/monitors";
@@ -21,7 +21,7 @@ const TAILS = [4, 8, 12];
 const weekOf = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const tone = (value: number | undefined) => (!value ? "text-muted" : value > 0 ? "text-up" : "text-down");
 
-/** ROT: the 11 sectors by trend and momentum against SPY, on a map and in a table. Clicking one opens its chart here. */
+/** ROT: the 11 sectors by trend and momentum against SPY, on a map and in a table. Clicking one opens its thesis check here. */
 export function SectorRotation({ onOpen }: { onOpen: (command: Command) => void }) {
   const [tail, setTail] = useState(4);
   const [active, setActive] = useState<string>();
@@ -54,7 +54,7 @@ export function SectorRotation({ onOpen }: { onOpen: (command: Command) => void 
     quadrant ? [{ symbol, name, quadrant, points: points.slice(-1 - tail) }] : [],
   );
   const lastWeek = benchmark.weeks.at(-1)?.week;
-  const open = (symbol: string) => onOpen({ fn: "GP", symbol, args: [] });
+  const open = (symbol: string) => onOpen(tickerCommand(symbol));
   const notSent = SECTORS.filter((s) => missing.includes(s.symbol)).map((s) => `${s.name} (${s.symbol})`);
 
   return (

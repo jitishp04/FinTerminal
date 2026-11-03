@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { fetchApi, pollEvery } from "@/lib/fetchApi";
 import { formatCompact, formatInteger, formatPercent, formatPrice } from "@/lib/format";
 import {
@@ -40,7 +40,7 @@ const COLUMNS: { key: SortKey; label: string; title: string; show: string; align
 /** A P/E bound from its field: blank for none. */
 const bound = (text: string) => (text.trim() === "" || Number.isNaN(Number(text)) ? undefined : Number(text));
 
-/** EQS: one of Yahoo's stock screens, sortable, with a market-cap floor and a P/E range. Clicking a row opens its overview. */
+/** EQS: one of Yahoo's stock screens, sortable, with a market-cap floor and a P/E range. Clicking a row opens its thesis check. */
 export function EquityScreener({ onOpen }: { onOpen: (command: Command) => void }) {
   const [id, setId] = useState<ScreenId>(SCREENS[0].id);
   const [sort, setSort] = useState<Sort | null>(null);
@@ -132,13 +132,13 @@ export function EquityScreener({ onOpen }: { onOpen: (command: Command) => void 
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <Row key={row.symbol} row={row} onOpen={() => onOpen({ fn: "DES", symbol: row.symbol, args: [] })} />
+                    <Row key={row.symbol} row={row} onOpen={() => onOpen(tickerCommand(row.symbol))} />
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          <p className="text-xs text-muted">Yahoo&apos;s screens and prices. Click a column to sort, a row to open the company.</p>
+          <p className="text-xs text-muted">Yahoo&apos;s screens and prices. Click a column to sort, a row to open its thesis check.</p>
         </>
       )}
     </div>

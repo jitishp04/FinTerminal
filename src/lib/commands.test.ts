@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandTitle, formatCommand, parseCommand } from "./commands";
+import { commandTitle, formatCommand, parseCommand, tickerCommand } from "./commands";
 
 function ok(input: string) {
   const result = parseCommand(input);
@@ -95,5 +95,14 @@ describe("commandTitle", () => {
     const result = parseCommand(input);
     if (!result.ok) throw new Error(result.error);
     expect(commandTitle(result.command)).toBe(expected);
+  });
+});
+
+describe("tickerCommand", () => {
+  it("opens a clicked ticker's thesis check, which parses back to the same command", () => {
+    expect(tickerCommand("AAPL")).toEqual({ fn: "THS", symbol: "AAPL", args: [] });
+    for (const symbol of ["AAPL", "BRK-B", "^GSPC", "EURUSD=X", "BTC-USD"]) {
+      expect(ok(formatCommand(tickerCommand(symbol)))).toEqual(tickerCommand(symbol));
+    }
   });
 });

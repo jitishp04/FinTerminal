@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { formatCompact, formatPrice, priceDecimals } from "@/lib/format";
 import type { Quote } from "@/lib/types";
 import { addSymbol, parseWatchlist, removeSymbol, watchlistStore } from "@/lib/watchlist";
@@ -95,7 +95,7 @@ export function Watchlist({ onOpen }: { onOpen: (command: Command) => void }) {
                 quote={quotes.get(symbol)}
                 loading={loading}
                 missing={error ? "—" : "No data"}
-                onOpen={() => onOpen({ fn: "GP", symbol, args: [] })}
+                onOpen={() => onOpen(tickerCommand(symbol))}
                 onRemove={() => save(removeSymbol(symbols, symbol))}
               />
             ))}

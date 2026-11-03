@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { formatUpdated } from "@/lib/format";
 import type { MonitorGroup } from "@/lib/monitors";
 import { QUOTE_TABLE, QuoteCells, QuotesError, useQuotes } from "./quotes";
@@ -11,7 +11,7 @@ interface QuoteMonitorProps {
   onOpen: (command: Command) => void;
 }
 
-/** A fixed list of instruments in titled groups. Clicking a row opens its chart here. */
+/** A fixed list of instruments in titled groups. Clicking a row opens its thesis check here. */
 export function QuoteMonitor({ groups, onOpen }: QuoteMonitorProps) {
   const symbols = useMemo(() => groups.flatMap((group) => group.items.map((item) => item.symbol)), [groups]);
   const { quotes, error, hasData, loading, updatedAt } = useQuotes(symbols);
@@ -45,7 +45,7 @@ export function QuoteMonitor({ groups, onOpen }: QuoteMonitorProps) {
               return (
                 <tr
                   key={symbol}
-                  onClick={() => onOpen({ fn: "GP", symbol, args: [] })}
+                  onClick={() => onOpen(tickerCommand(symbol))}
                   className="cursor-pointer hover:bg-border"
                 >
                   {/* In a narrow panel, the name is what gives way. */}

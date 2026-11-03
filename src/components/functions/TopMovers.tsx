@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Command } from "@/lib/commands";
+import { type Command, tickerCommand } from "@/lib/commands";
 import { fetchApi } from "@/lib/fetchApi";
 import { formatCompact } from "@/lib/format";
 import type { MoverType, Quote } from "@/lib/types";
@@ -16,7 +16,7 @@ const LISTS: { type: MoverType; label: string }[] = [
   { type: "actives", label: "Most active" },
 ];
 
-/** The day's top US stocks, one list at a time. Clicking a row opens its chart here. */
+/** The day's top US stocks, one list at a time. Clicking a row opens its thesis check here. */
 export function TopMovers({ onOpen }: { onOpen: (command: Command) => void }) {
   const [type, setType] = useState<MoverType>("gainers");
   const { data, error } = useQuery({
@@ -71,7 +71,7 @@ export function TopMovers({ onOpen }: { onOpen: (command: Command) => void }) {
             {data.map((quote) => (
               <tr
                 key={quote.symbol}
-                onClick={() => onOpen({ fn: "GP", symbol: quote.symbol, args: [] })}
+                onClick={() => onOpen(tickerCommand(quote.symbol))}
                 className="cursor-pointer hover:bg-border"
               >
                 <td className="text-left">
